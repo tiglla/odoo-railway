@@ -26,7 +26,6 @@ class EigrConstructionProject(models.Model):
         "res.partner",
         string="Cliente",
         tracking=True,
-        domain="[('is_company', '=', True)]",
         check_company=True,
     )
     contract_number = fields.Char(string="Número de contrato", tracking=True)

@@ -41,6 +41,13 @@ class BitrixConfig(models.Model):
         readonly=True,
     )
 
+    project_responsible_id = fields.Many2one(
+        "res.users",
+        string="Responsable de nuevas obras",
+        default=lambda self: self.env.ref("base.user_admin"),
+        help="Usuario asignado a las obras creadas al ganar un negocio en Bitrix24.",
+    )
+
     def action_sync_now(self):
 
         self.ensure_one()
@@ -68,7 +75,7 @@ class BitrixConfig(models.Model):
             "E: %(companies_exported)s | "
             "Negocios N: %(deals_imported)s | "
             "A: %(deals_updated)s | "
-            "E: %(deals_exported)s"
+            "E: %(deals_exported)s | Obras creadas: %(projects_created)s"
         ) % result
         if errors:
             message += _(" | Fallidos: %s. ") % len(errors)

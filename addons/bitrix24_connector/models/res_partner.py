@@ -279,8 +279,10 @@ class ResPartner(models.Model):
             self.sync_companies_with_bitrix(api)
         )
 
-        deals_imported, deals_updated, deals_exported = (
-            self.env["bitrix.deal"].sync_deals_with_bitrix(api)
+        deals_imported, deals_updated, deals_exported, projects_created, project_errors = (
+            self.env["bitrix.deal"].sync_deals_with_bitrix(
+                api, quiet=False, config=config
+            )
         )
 
         config.last_sync = fields.Datetime.now()
@@ -295,7 +297,8 @@ class ResPartner(models.Model):
             "deals_imported": deals_imported,
             "deals_updated": deals_updated,
             "deals_exported": deals_exported,
-            "sync_errors": contact_errors + company_errors,
+            "projects_created": projects_created,
+            "sync_errors": contact_errors + company_errors + project_errors,
         }
 
     def import_bitrix_contacts(self):

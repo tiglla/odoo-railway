@@ -45,6 +45,7 @@
                         <field name="webhook_url" password="True"/>
                         <field name="active"/>
                         <field name="sync_interval"/>
+                        <field name="project_responsible_id"/>
                         <field name="last_sync" readonly="True"/>
                     </group>
 

@@ -76,10 +76,12 @@ class BitrixAPI:
         "ID",
         "TITLE",
         "STAGE_ID",
+        "STAGE_SEMANTIC_ID",
         "CATEGORY_ID",
         "CONTACT_ID",
         "COMPANY_ID",
         "OPPORTUNITY",
+        "CURRENCY_ID",
         "DATE_MODIFY",
     ]
 

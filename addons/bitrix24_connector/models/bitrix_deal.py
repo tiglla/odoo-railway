@@ -22,11 +22,23 @@ class BitrixDeal(models.Model):
     )
 
     stage_id = fields.Char(string="Fase (Stage ID)")
+    stage_semantic_id = fields.Selection(
+        [("P", "En curso"), ("S", "Ganado"), ("F", "Perdido")],
+        string="Resultado de la fase",
+        readonly=True,
+    )
     category_id = fields.Char(string="Categoría (Category ID)")
     opportunity = fields.Float(string="Importe")
+    currency_code = fields.Char(string="Moneda Bitrix24", readonly=True)
 
     partner_id = fields.Many2one("res.partner", string="Contacto")
     company_id = fields.Many2one("res.partner", string="Empresa")
+    project_id = fields.Many2one(
+        "eigr.construction.project",
+        string="Obra creada",
+        readonly=True,
+        copy=False,
+    )
 
     date_modify = fields.Datetime(string="Última modificación")
     bitrix_last_sync = fields.Datetime(
@@ -52,7 +64,7 @@ class BitrixDeal(models.Model):
         if not bitrix_id:
             return False
         return self.env["res.partner"].search(
-            [(bitrix_entity, "=", bitrix_id)], limit=1
+            [(bitrix_entity, "=", str(bitrix_id))], limit=1
         )
 
     @api.model
@@ -68,8 +80,10 @@ class BitrixDeal(models.Model):
         return {
             "name": deal.get("TITLE") or "Bitrix Deal",
             "stage_id": deal.get("STAGE_ID"),
+            "stage_semantic_id": deal.get("STAGE_SEMANTIC_ID") or False,
             "category_id": deal.get("CATEGORY_ID"),
             "opportunity": deal.get("OPPORTUNITY") or 0.0,
+            "currency_code": deal.get("CURRENCY_ID") or False,
             "partner_id": self._find_partner(
                 "bitrix_contact_id", contact_id
             ).id or False,
@@ -81,7 +95,94 @@ class BitrixDeal(models.Model):
             ),
         }
 
-    def sync_deals_with_bitrix(self, api, quiet=True):
+    def _ensure_won_projects(self, config):
+        Project = self.env["eigr.construction.project"].sudo()
+        responsible = (
+            config.project_responsible_id
+            or self.env.ref("base.user_admin")
+        )
+        created = 0
+        errors = []
+
+        won_deals = self.search([
+            ("stage_semantic_id", "=", "S"),
+            ("bitrix_deal_id", "!=", False),
+            ("project_id", "=", False),
+        ])
+        for deal in won_deals:
+            project = Project.with_context(active_test=False).search([
+                ("bitrix_deal_id", "=", deal.bitrix_deal_id),
+            ], limit=1)
+            if project:
+                deal.project_id = project.id
+                continue
+
+            client = deal.company_id or deal.partner_id
+            if not client:
+                message = (
+                    f"Negocio Bitrix24 {deal.bitrix_deal_id} ({deal.name}): "
+                    "no tiene contacto ni empresa vinculados en Odoo; "
+                    "no se creó la obra."
+                )
+                _logger.warning("%s", message)
+                errors.append(message)
+                continue
+
+            odoo_currency = self.env.company.currency_id.name
+            if (
+                deal.currency_code
+                and deal.currency_code.upper() != odoo_currency.upper()
+            ):
+                message = (
+                    f"Negocio Bitrix24 {deal.bitrix_deal_id} ({deal.name}): "
+                    f"moneda {deal.currency_code} distinta de {odoo_currency}; "
+                    "no se creó la obra para evitar un monto incorrecto."
+                )
+                _logger.warning("%s", message)
+                errors.append(message)
+                continue
+
+            try:
+                with self.env.cr.savepoint():
+                    project = Project.create({
+                        "name": deal.name,
+                        "client_id": client.id,
+                        "contract_amount": deal.opportunity,
+                        "bitrix_deal_id": deal.bitrix_deal_id,
+                        "responsible_id": responsible.id,
+                    })
+                    deal.project_id = project.id
+            except Exception as error:
+                project = Project.with_context(active_test=False).search([
+                    ("bitrix_deal_id", "=", deal.bitrix_deal_id),
+                ], limit=1)
+                if project:
+                    deal.project_id = project.id
+                    continue
+                message = (
+                    f"Negocio Bitrix24 {deal.bitrix_deal_id} ({deal.name}): "
+                    f"no se pudo crear la obra: {error}"
+                )
+                _logger.exception("%s", message)
+                errors.append(message)
+                continue
+            created += 1
+
+        return created, errors
+
+    def action_open_project(self):
+        self.ensure_one()
+        if not self.project_id:
+            raise UserError(_("Este negocio aún no tiene una obra vinculada."))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Obra"),
+            "res_model": "eigr.construction.project",
+            "view_mode": "form",
+            "res_id": self.project_id.id,
+        }
+
+    def sync_deals_with_bitrix(self, api, quiet=True, config=None):
         imported = 0
         updated = 0
         exported = 0
@@ -91,11 +192,11 @@ class BitrixDeal(models.Model):
         except Exception as error:
             if quiet:
                 _logger.error("Bitrix24: fallo obteniendo deals: %s", error)
-                return imported, updated, exported
+                return imported, updated, exported, 0, []
             raise
 
         deals_by_id = {
-            deal.get("ID"): deal
+            str(deal.get("ID")): deal
             for deal in deals
             if deal.get("ID")
         }
@@ -118,8 +219,10 @@ class BitrixDeal(models.Model):
             current = {
                 "name": existing.name or "",
                 "stage_id": existing.stage_id or False,
+                "stage_semantic_id": existing.stage_semantic_id or False,
                 "category_id": existing.category_id or False,
                 "opportunity": existing.opportunity or 0.0,
+                "currency_code": existing.currency_code or False,
                 "partner_id": existing.partner_id.id or False,
                 "company_id": existing.company_id.id or False,
             }
@@ -127,8 +230,10 @@ class BitrixDeal(models.Model):
             incoming = {
                 "name": values.get("name") or "",
                 "stage_id": values.get("stage_id") or False,
+                "stage_semantic_id": values.get("stage_semantic_id") or False,
                 "category_id": values.get("category_id") or False,
                 "opportunity": values.get("opportunity") or 0.0,
+                "currency_code": values.get("currency_code") or False,
                 "partner_id": values.get("partner_id") or False,
                 "company_id": values.get("company_id") or False,
             }
@@ -141,6 +246,10 @@ class BitrixDeal(models.Model):
                 bitrix_last_sync=fields.Datetime.now(),
             ))
             updated += 1
+
+        if config is None:
+            config = self._get_bitrix_config()
+        projects_created, project_errors = self._ensure_won_projects(config)
 
         if not api:
             config = self._get_bitrix_config()
@@ -171,4 +280,4 @@ class BitrixDeal(models.Model):
                 deal.bitrix_last_sync = fields.Datetime.now()
                 exported += 1
 
-        return imported, updated, exported
+        return imported, updated, exported, projects_created, project_errors

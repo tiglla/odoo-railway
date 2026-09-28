@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_eigr_construction_project_bitrix_link" model="ir.ui.view">
+        <field name="name">eigr.construction.project.bitrix.link</field>
+        <field name="model">eigr.construction.project</field>
+        <field name="inherit_id" ref="eigr_construction_management.view_eigr_construction_project_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='contract_number']" position="after">
+                <field name="bitrix_deal_id" readonly="1" invisible="not bitrix_deal_id"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

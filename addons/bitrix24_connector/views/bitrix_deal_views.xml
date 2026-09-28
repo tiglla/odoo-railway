@@ -12,7 +12,10 @@
                 <field name="partner_id"/>
                 <field name="company_id"/>
                 <field name="stage_id"/>
+                <field name="stage_semantic_id"/>
                 <field name="opportunity"/>
+                <field name="currency_code"/>
+                <field name="project_id" groups="eigr_construction_management.group_eigr_user"/>
                 <field name="date_modify"/>
             </list>
         </field>
@@ -24,15 +27,21 @@
 
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="action_open_project" type="object" string="Abrir obra" class="btn-primary" invisible="not project_id" groups="eigr_construction_management.group_eigr_user"/>
+                </header>
                 <sheet>
                     <group>
                         <field name="name"/>
                         <field name="partner_id"/>
                         <field name="company_id"/>
                         <field name="stage_id"/>
+                        <field name="stage_semantic_id" readonly="1"/>
                         <field name="category_id"/>
                         <field name="opportunity"/>
+                        <field name="currency_code" readonly="1"/>
                         <field name="bitrix_deal_id" readonly="True"/>
+                        <field name="project_id" readonly="1" groups="eigr_construction_management.group_eigr_user"/>
                         <field name="date_modify"/>
                         <field name="bitrix_last_sync" readonly="True"/>
                     </group>
