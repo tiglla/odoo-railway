@@ -1,5 +1,7 @@
 # Flujo Bitrix24 → Odoo → Bitrix24
 
+La configuración, los mapeos y los negocios del conector son administrados por usuarios del grupo **Administración/Ajustes** (`base.group_system`). Los usuarios internos sin ese grupo no pueden leer la URL del webhook ni modificar negocios sincronizados. Para aplicar este cambio de permisos en una base ya instalada, **actualice el módulo**; desplegar archivos sin actualizarlo deja los accesos anteriores en la base de datos.
+
 1. Despliegue el código y **actualice el módulo `bitrix24_connector`** en la base de datos. Reiniciar Odoo no crea las nuevas columnas y tablas.
 2. En **Bitrix24 → Configuración**, pulse **Preparar campos de obra en Bitrix24** con un administrador. El webhook entrante usado por Odoo necesita permiso de CRM. Se crean nueve campos del negocio: código, fase, avance, fin previsto, próximo hito, fecha del hito, días de atraso, última actualización y último aviso al cliente. Puede usar campos existentes con esos tipos si introduce sus códigos `UF_CRM_...` manualmente.
 3. Asocie los vendedores de Bitrix24 a los responsables de Odoo en la pestaña **Responsables**. El responsable general configurado es el respaldo.

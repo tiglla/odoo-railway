@@ -177,6 +177,7 @@ class BitrixDeal(models.Model):
 
     def action_open_project(self):
         self.ensure_one()
+        self.check_access("read")
         if not self.project_id:
             raise UserError(_("Este negocio aún no tiene una obra vinculada."))
         return {
@@ -320,7 +321,7 @@ class BitrixDeal(models.Model):
         )
 
     @api.model
-    def sync_deal_event(self, config, deal_id):
+    def _sync_deal_event(self, config, deal_id):
         """Fetch the current deal; event notifications only contain its ID."""
         api = BitrixAPI(config.webhook_url)
         deal = api.get_deal(deal_id)

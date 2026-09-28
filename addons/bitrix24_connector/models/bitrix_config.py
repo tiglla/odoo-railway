@@ -23,6 +23,7 @@ class BitrixConfig(models.Model):
     webhook_url = fields.Char(
         string="Webhook URL",
         required=True,
+        groups="base.group_system",
         help="URL del webhook entrante de Bitrix24.",
     )
 
@@ -85,6 +86,10 @@ class BitrixConfig(models.Model):
 
     def _originator_id(self):
         return f"ODOO_EIGR_{self.env.cr.dbname}"
+
+    def _check_connector_admin(self):
+        if not self.env.user.has_group("base.group_system"):
+            raise AccessError(_("Solo un administrador puede gestionar Bitrix24."))
 
     def _due_retry_ids(self, model, operation):
         self.ensure_one()
@@ -152,8 +157,7 @@ class BitrixConfig(models.Model):
 
     def action_setup_project_fields(self):
         self.ensure_one()
-        if not self.env.user.has_group("base.group_system"):
-            raise AccessError(_("Solo un administrador puede crear campos en Bitrix24."))
+        self._check_connector_admin()
         api = BitrixAPI(self.webhook_url)
         definitions = [
             ("deal_field_project_code", "EIGR_OBRA_CODIGO", "string", "Código de obra EIGR"),
@@ -204,6 +208,7 @@ class BitrixConfig(models.Model):
     def action_sync_now(self):
 
         self.ensure_one()
+        self._check_connector_admin()
 
         try:
 
@@ -299,6 +304,7 @@ class BitrixConfig(models.Model):
     def action_test_connection(self):
 
         self.ensure_one()
+        self._check_connector_admin()
 
         api = BitrixAPI(self.webhook_url)
 
@@ -337,6 +343,7 @@ class BitrixConfig(models.Model):
     def action_import_contacts(self):
 
         self.ensure_one()
+        self._check_connector_admin()
 
         return self.env[
             "res.partner"

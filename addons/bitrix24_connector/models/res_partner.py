@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from odoo import models, fields, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 from ..services.bitrix_api import BitrixAPI
 
@@ -17,17 +17,20 @@ class ResPartner(models.Model):
         string="Bitrix24 Contact ID",
         index=True,
         copy=False,
+        groups="base.group_system",
     )
 
     bitrix_company_id = fields.Char(
         string="Bitrix24 Company ID",
         index=True,
         copy=False,
+        groups="base.group_system",
     )
 
     bitrix_last_sync = fields.Datetime(
         string="Última sincronización Bitrix24",
         readonly=True,
+        groups="base.group_system",
     )
 
     _bitrix_company_id_unique = models.Constraint(
@@ -284,6 +287,9 @@ class ResPartner(models.Model):
 
     def sync_with_bitrix(self, config):
 
+        if not self.env.user.has_group("base.group_system"):
+            raise AccessError(_("Solo un administrador puede sincronizar Bitrix24."))
+
         api = BitrixAPI(config.webhook_url)
 
         contacts_cutoff = fields.Datetime.now()
@@ -332,6 +338,9 @@ class ResPartner(models.Model):
         }
 
     def import_bitrix_contacts(self):
+
+        if not self.env.user.has_group("base.group_system"):
+            raise AccessError(_("Solo un administrador puede importar contactos de Bitrix24."))
 
         config = self._get_bitrix_config()
 

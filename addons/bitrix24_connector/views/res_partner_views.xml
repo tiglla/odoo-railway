@@ -9,7 +9,7 @@
 
         <field name="arch" type="xml">
             <xpath expr="//sheet/notebook" position="inside">
-                <page string="Bitrix24" name="bitrix24">
+                <page string="Bitrix24" name="bitrix24" groups="base.group_system">
                     <group>
                         <field name="bitrix_contact_id"/>
                         <field name="bitrix_company_id"/>

@@ -185,7 +185,7 @@ class TestWonDealProject(TransactionCase):
             "COMPANY_ID": "101", "CURRENCY_ID": self.env.company.currency_id.name,
         }
         with patch.object(BitrixAPI, "get_deal", return_value=api.get_deal.return_value):
-            self.Deal.sync_deal_event(self.config, "509")
+            self.Deal._sync_deal_event(self.config, "509")
         self.assertEqual(self.Project.search_count([("bitrix_deal_id", "=", "509")]), 1)
 
     def test_bitrix_notice_trigger_is_only_sent_in_bitrix_mode(self):

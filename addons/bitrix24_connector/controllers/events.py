@@ -32,7 +32,7 @@ class BitrixDealEvents(http.Controller):
         if not config:
             return request.make_response("forbidden", status=403)
         try:
-            request.env["bitrix.deal"].sudo().sync_deal_event(config, deal_id)
+            request.env["bitrix.deal"].sudo()._sync_deal_event(config, deal_id)
         except Exception:
             _logger.exception("Bitrix24: falló el evento del negocio %s", deal_id)
             return request.make_response("retry later", status=503)

@@ -111,6 +111,7 @@
     <menuitem
         id="menu_bitrix_root"
         name="Bitrix24"
+        groups="base.group_system"
         sequence="50"
     />
 
