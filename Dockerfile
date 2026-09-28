@@ -10,5 +10,4 @@ RUN chown -R odoo:odoo /mnt/extra-addons
 
 USER odoo
 
-
 ENTRYPOINT ["/entrypoint-custom.sh"]
