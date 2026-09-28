@@ -277,8 +277,11 @@ class EigrConstructionProject(models.Model):
         is_responsible = self.env.user.has_group(
             "eigr_construction_management.group_eigr_responsible"
         )
+        is_construction_admin = self.env.user.has_group(
+            "eigr_construction_management.group_eigr_admin"
+        )
         unauthorized = self.filtered(
-            lambda project: not self.env.is_admin()
+            lambda project: not (self.env.is_admin() or is_construction_admin)
             and (not is_responsible or project.responsible_id != self.env.user)
         )
         if unauthorized:

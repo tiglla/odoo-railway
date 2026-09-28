@@ -289,6 +289,9 @@ class EigrConstructionRequirement(models.Model):
     def write(self, vals):
         if (
             not self.env.su
+            and not self.env.user.has_group(
+                "eigr_construction_management.group_eigr_admin"
+            )
             and self.env.user.has_group(
                 "eigr_construction_management.group_eigr_manager"
             )

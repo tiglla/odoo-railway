@@ -59,6 +59,19 @@ class TestEigrConstructionProject(TransactionCase):
         with self.assertRaises(AccessError):
             project.with_user(self.team_user).action_close()
 
+    def test_odoo_administrator_controls_unassigned_project(self):
+        administrator = self.env.ref("base.user_admin")
+        self.assertTrue(administrator.has_group(
+            "eigr_construction_management.group_eigr_admin"
+        ))
+        project = self.Project.with_user(administrator).create(
+            self._project_values("ADMIN")
+        )
+        project.with_user(administrator).action_startup()
+        self.assertEqual(project.state, "startup")
+        project.with_user(administrator).write({"name": "Obra administrada"})
+        self.assertEqual(project.name, "Obra administrada")
+
     def test_reject_invalid_dates_and_progress(self):
         invalid_dates = self._project_values("DATES")
         invalid_dates.update(
