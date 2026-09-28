@@ -1,7 +1,9 @@
 import logging
+import json
+from datetime import timedelta
 
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 from ..services.bitrix_api import BitrixAPI
 
@@ -41,12 +43,145 @@ class BitrixConfig(models.Model):
         readonly=True,
     )
 
+    contacts_cursor = fields.Datetime(string="Contactos leídos hasta", readonly=True)
+    companies_cursor = fields.Datetime(string="Empresas leídas hasta", readonly=True)
+    deals_cursor = fields.Datetime(string="Negocios leídos hasta", readonly=True)
+
+    deal_field_project_code = fields.Char(string="Campo Bitrix: código de obra")
+    deal_field_project_state = fields.Char(string="Campo Bitrix: estado de obra")
+    deal_field_project_progress = fields.Char(string="Campo Bitrix: avance físico")
+    deal_field_project_end_date = fields.Char(string="Campo Bitrix: fecha prevista")
+
+    user_mapping_ids = fields.One2many(
+        "bitrix.user.mapping", "config_id", string="Vendedores y responsables"
+    )
+
     project_responsible_id = fields.Many2one(
         "res.users",
         string="Responsable de nuevas obras",
         default=lambda self: self.env.ref("base.user_admin"),
         help="Usuario asignado a las obras creadas al ganar un negocio en Bitrix24.",
     )
+
+    @staticmethod
+    def _pull_filter(cursor):
+        if not cursor:
+            return None
+        start = cursor - timedelta(minutes=2)
+        return {"filter": {">=DATE_MODIFY": start.strftime("%Y-%m-%dT%H:%M:%SZ")}}
+
+    def _originator_id(self):
+        return f"ODOO_EIGR_{self.env.cr.dbname}"
+
+    def _due_retry_ids(self, model, operation):
+        self.ensure_one()
+        logs = self.env["bitrix.sync.log"].sudo().search([
+            ("config_id", "=", self.id),
+            ("resource_model", "=", model),
+            ("operation", "ilike", operation),
+            ("status", "=", "failed"),
+            ("next_retry", "<=", fields.Datetime.now()),
+        ])
+        return logs.mapped("resource_id")
+
+    def _push_record(self, record, operation, payload, send):
+        """Log every attempt and leave failed records eligible for a later retry."""
+        self.ensure_one()
+        Log = self.env["bitrix.sync.log"].sudo()
+        pending = Log.search([
+            ("config_id", "=", self.id),
+            ("resource_model", "=", record._name),
+            ("resource_id", "=", record.id),
+            ("operation", "=", operation),
+            ("status", "=", "failed"),
+        ], order="id desc", limit=1)
+        now = fields.Datetime.now()
+        if pending and pending.next_retry and pending.next_retry > now:
+            return False, None, None
+
+        attempts = (pending.attempts + 1) if pending else 1
+        values = {
+            "config_id": self.id,
+            "run_datetime": now,
+            "direction": "push",
+            "resource_model": record._name,
+            "resource_id": record.id,
+            "operation": operation,
+            "payload_json": json.dumps(payload, ensure_ascii=False, default=str),
+            "attempts": attempts,
+        }
+        if pending:
+            pending.write({"status": "retried"})
+        try:
+            result = send()
+            if not result:
+                raise ValueError("Bitrix24 no confirmó la operación.")
+        except Exception as error:
+            minutes = min(5 * 2 ** min(attempts - 1, 8), 1440)
+            Log.create(dict(
+                values,
+                status="failed",
+                failed=1,
+                error_log=str(error),
+                next_retry=now + timedelta(minutes=minutes),
+            ))
+            return False, None, str(error)
+
+        Log.search([
+            ("config_id", "=", self.id),
+            ("resource_model", "=", record._name),
+            ("resource_id", "=", record.id),
+            ("operation", "ilike", operation.rsplit(".", 1)[0]),
+            ("status", "=", "failed"),
+        ]).write({"status": "retried"})
+        Log.create(dict(values, status="success", exported=1))
+        return True, result, None
+
+    def action_setup_project_fields(self):
+        self.ensure_one()
+        if not self.env.user.has_group("base.group_system"):
+            raise AccessError(_("Solo un administrador puede crear campos en Bitrix24."))
+        api = BitrixAPI(self.webhook_url)
+        definitions = [
+            ("deal_field_project_code", "EIGR_OBRA_CODIGO", "string", "Código de obra EIGR"),
+            ("deal_field_project_state", "EIGR_OBRA_ESTADO", "string", "Estado de obra EIGR"),
+            ("deal_field_project_progress", "EIGR_OBRA_AVANCE", "double", "Avance físico EIGR (%)"),
+            ("deal_field_project_end_date", "EIGR_OBRA_FIN", "date", "Fin previsto de obra EIGR"),
+        ]
+        try:
+            existing = {
+                item["FIELD_NAME"]: item
+                for item in api.get_deal_userfields()
+            }
+            values = {}
+            for setting, code, field_type, label in definitions:
+                full_code = f"UF_CRM_{code}"
+                field = existing.get(full_code)
+                if field and field.get("USER_TYPE_ID") != field_type:
+                    raise ValueError(
+                        f"{full_code} ya existe con un tipo distinto de {field_type}."
+                    )
+                if not field:
+                    created_id = api.create_deal_userfield({
+                        "FIELD_NAME": code,
+                        "USER_TYPE_ID": field_type,
+                        "LABEL": label,
+                    })
+                    if not created_id:
+                        raise ValueError(f"Bitrix24 no confirmó la creación de {full_code}.")
+                values[setting] = full_code
+            self.write(values)
+        except Exception as error:
+            raise UserError(_("No se pudieron preparar los campos en Bitrix24: %s") % error)
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Bitrix24"),
+                "message": _("Los cuatro campos de avance de obra están configurados."),
+                "type": "success",
+            },
+        }
 
     def action_sync_now(self):
 
@@ -66,6 +201,9 @@ class BitrixConfig(models.Model):
             )
 
         errors = result.get("sync_errors", [])
+        pending_count = self.env["bitrix.sync.log"].sudo().search_count([
+            ("config_id", "=", self.id), ("status", "=", "failed")
+        ])
         message = _(
             "Sync completado. Contactos "
             "N: %(imported)s | A: %(updated)s | "
@@ -75,13 +213,16 @@ class BitrixConfig(models.Model):
             "E: %(companies_exported)s | "
             "Negocios N: %(deals_imported)s | "
             "A: %(deals_updated)s | "
-            "E: %(deals_exported)s | Obras creadas: %(projects_created)s"
+            "E: %(deals_exported)s | Obras creadas: %(projects_created)s "
+            "| Avances enviados: %(projects_exported)s"
         ) % result
         if errors:
             message += _(" | Fallidos: %s. ") % len(errors)
             message += " | ".join(errors[:3])
             if len(errors) > 3:
                 message += _(" | Revise los logs para ver los demás.")
+        if pending_count:
+            message += _(" | Reintentos pendientes: %s.") % pending_count
 
         return {
             "type": "ir.actions.client",
@@ -89,8 +230,8 @@ class BitrixConfig(models.Model):
             "params": {
                 "title": _("Bitrix24"),
                 "message": message,
-                "type": "warning" if errors else "success",
-                "sticky": bool(errors),
+                "type": "warning" if (errors or pending_count) else "success",
+                "sticky": bool(errors or pending_count),
             },
         }
 
@@ -114,7 +255,13 @@ class BitrixConfig(models.Model):
                 fields.Datetime.now() - config.last_sync
             ).total_seconds() / 60
 
-            if elapsed < config.sync_interval:
+            self.env["bitrix.sync.log"].discard_missing_retries(config)
+            due_retry = self.env["bitrix.sync.log"].sudo().search_count([
+                ("config_id", "=", config.id),
+                ("status", "=", "failed"),
+                ("next_retry", "<=", fields.Datetime.now()),
+            ])
+            if elapsed < config.sync_interval and not due_retry:
                 return
 
         try:

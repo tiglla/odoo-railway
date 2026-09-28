@@ -13,6 +13,7 @@
                 <field name="company_id"/>
                 <field name="stage_id"/>
                 <field name="stage_semantic_id"/>
+                <field name="assigned_by_id"/>
                 <field name="opportunity"/>
                 <field name="currency_code"/>
                 <field name="project_id" groups="eigr_construction_management.group_eigr_user"/>
@@ -37,6 +38,7 @@
                         <field name="company_id"/>
                         <field name="stage_id"/>
                         <field name="stage_semantic_id" readonly="1"/>
+                        <field name="assigned_by_id" readonly="1"/>
                         <field name="category_id"/>
                         <field name="opportunity"/>
                         <field name="currency_code" readonly="1"/>

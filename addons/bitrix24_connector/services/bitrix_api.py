@@ -82,6 +82,7 @@ class BitrixAPI:
         "COMPANY_ID",
         "OPPORTUNITY",
         "CURRENCY_ID",
+        "ASSIGNED_BY_ID",
         "DATE_MODIFY",
     ]
 
@@ -132,6 +133,19 @@ class BitrixAPI:
             },
         )
 
+    def find_by_origin(self, entity, originator_id, origin_id):
+        if entity not in ("contact", "company", "deal"):
+            raise ValueError("Entidad Bitrix24 no soportada.")
+        records = self._paginate(
+            f"crm.{entity}.list",
+            ["ID"],
+            {"filter": {
+                "ORIGINATOR_ID": originator_id,
+                "ORIGIN_ID": origin_id,
+            }},
+        )
+        return records[0].get("ID") if records else False
+
     def test_connection(self):
 
         return self.call(
@@ -139,11 +153,12 @@ class BitrixAPI:
             {}
         )
 
-    def get_contacts(self):
+    def get_contacts(self, extra=None):
 
         return self._paginate(
             "crm.contact.list",
             self.CONTACT_SELECT,
+            extra,
         )
 
     def create_contact(self, values):
@@ -158,11 +173,12 @@ class BitrixAPI:
             values,
         )
 
-    def get_companies(self):
+    def get_companies(self, extra=None):
 
         return self._paginate(
             "crm.company.list",
             self.COMPANY_SELECT,
+            extra,
         )
 
     def create_company(self, values):
@@ -188,6 +204,20 @@ class BitrixAPI:
     def create_deal(self, values):
 
         return self._add("crm.deal.add", values)
+
+    def update_deal(self, bitrix_id, values):
+
+        return self._update("crm.deal.update", bitrix_id, values)
+
+    def get_deal_userfields(self):
+
+        return self._paginate(
+            "crm.deal.userfield.list", ["ID", "FIELD_NAME", "USER_TYPE_ID"]
+        )
+
+    def create_deal_userfield(self, values):
+
+        return self._add("crm.deal.userfield.add", values)
 
     def get_deal_categories(self):
 

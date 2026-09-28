@@ -2,3 +2,5 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_bitrix_config_user,bitrix.config.user,model_bitrix_config,base.group_user,1,1,1,1
 access_bitrix_field_mapping_user,bitrix.field.mapping.user,model_bitrix_field_mapping,base.group_user,1,1,1,1
 access_bitrix_deal_user,bitrix.deal.user,model_bitrix_deal,base.group_user,1,1,1,1
+access_bitrix_sync_log_admin,bitrix.sync.log.admin,model_bitrix_sync_log,base.group_system,1,1,1,0
+access_bitrix_user_mapping_admin,bitrix.user.mapping.admin,model_bitrix_user_mapping,base.group_system,1,1,1,1

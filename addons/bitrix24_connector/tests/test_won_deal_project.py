@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+from odoo import Command
 from odoo.tests.common import TransactionCase
 
 from ..services.bitrix_api import BitrixAPI
@@ -24,9 +25,18 @@ class TestWonDealProject(TransactionCase):
 
     def _sync(
         self, semantic, *, deal_id="501", company_id="101",
-        contact_id=None, currency=None
+        contact_id=None, currency=None, assigned_by=None
     ):
         api = Mock()
+        api.get_deal_userfields.return_value = [
+            {"FIELD_NAME": name, "USER_TYPE_ID": field_type}
+            for name, field_type in (
+                (self.config.deal_field_project_code, "string"),
+                (self.config.deal_field_project_state, "string"),
+                (self.config.deal_field_project_progress, "double"),
+                (self.config.deal_field_project_end_date, "date"),
+            ) if name
+        ]
         api.get_deals.return_value = [{
             "ID": deal_id,
             "TITLE": "Contrato de construcción",
@@ -37,8 +47,11 @@ class TestWonDealProject(TransactionCase):
             "CONTACT_ID": contact_id,
             "OPPORTUNITY": 125000,
             "CURRENCY_ID": currency or self.env.company.currency_id.name,
+            "ASSIGNED_BY_ID": assigned_by,
         }]
-        return self.Deal.sync_deals_with_bitrix(api, config=self.config)
+        result = self.Deal.sync_deals_with_bitrix(api, config=self.config)
+        self.last_api = api
+        return result
 
     def test_won_deal_creates_one_project_and_preserves_project_edits(self):
         self.assertIn("STAGE_SEMANTIC_ID", BitrixAPI.DEAL_SELECT)
@@ -80,14 +93,14 @@ class TestWonDealProject(TransactionCase):
     def test_won_deal_without_client_is_reported_and_not_converted(self):
         result = self._sync("S", deal_id="503", company_id=None)
         self.assertEqual(result[3], 0)
-        self.assertIn("503", result[4][0])
+        self.assertIn("503", result[5][0])
         self.assertFalse(self.Project.search([("bitrix_deal_id", "=", "503")]))
 
     def test_won_deal_with_different_currency_is_not_converted(self):
         currency = "USD" if self.env.company.currency_id.name != "USD" else "PEN"
         result = self._sync("S", deal_id="504", currency=currency)
         self.assertEqual(result[3], 0)
-        self.assertIn("moneda", result[4][0])
+        self.assertIn("moneda", result[5][0])
         self.assertFalse(self.Project.search([("bitrix_deal_id", "=", "504")]))
 
     def test_existing_project_is_linked_without_creating_another(self):
@@ -103,3 +116,33 @@ class TestWonDealProject(TransactionCase):
         self.assertEqual(self.Project.search_count([
             ("bitrix_deal_id", "=", "505")
         ]), 1)
+
+    def test_bitrix_salesperson_sets_project_responsible(self):
+        self.config.user_mapping_ids = [Command.create({
+            "bitrix_user_id": "88",
+            "user_id": self.env.user.id,
+        })]
+        self._sync("S", deal_id="506", assigned_by="88")
+        project = self.Project.search([("bitrix_deal_id", "=", "506")])
+        self.assertEqual(project.responsible_id, self.env.user)
+
+    def test_project_progress_is_sent_only_when_it_changes(self):
+        self.config.write({
+            "deal_field_project_code": "UF_CRM_EIGR_CODE",
+            "deal_field_project_state": "UF_CRM_EIGR_STATE",
+            "deal_field_project_progress": "UF_CRM_EIGR_PROGRESS",
+            "deal_field_project_end_date": "UF_CRM_EIGR_END",
+        })
+        result = self._sync("S", deal_id="507")
+        self.assertEqual(result[4], 1)
+        self.last_api.update_deal.assert_called_once()
+        payload = self.last_api.update_deal.call_args.args[1]
+        self.assertEqual(payload["UF_CRM_EIGR_PROGRESS"], 0)
+        self.assertEqual(self._sync("S", deal_id="507")[4], 0)
+        project = self.Project.search([("bitrix_deal_id", "=", "507")])
+        project.progress_percent = 35
+        self.assertEqual(self._sync("S", deal_id="507")[4], 1)
+        self.assertEqual(
+            self.last_api.update_deal.call_args.args[1]["UF_CRM_EIGR_PROGRESS"],
+            35,
+        )

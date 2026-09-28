@@ -8,6 +8,12 @@
         <field name="arch" type="xml">
             <list>
                 <field name="run_datetime"/>
+                <field name="status"/>
+                <field name="resource_model"/>
+                <field name="resource_id"/>
+                <field name="operation"/>
+                <field name="attempts"/>
+                <field name="next_retry"/>
                 <field name="direction"/>
                 <field name="incremental"/>
                 <field name="imported"/>
@@ -26,6 +32,12 @@
                 <sheet>
                     <group>
                         <field name="run_datetime"/>
+                        <field name="status"/>
+                        <field name="resource_model"/>
+                        <field name="resource_id"/>
+                        <field name="operation"/>
+                        <field name="attempts"/>
+                        <field name="next_retry"/>
                         <field name="direction"/>
                         <field name="incremental"/>
                     </group>
@@ -36,6 +48,9 @@
                         <field name="failed"/>
                     </group>
                     <notebook>
+                        <page string="Datos enviados">
+                            <field name="payload_json"/>
+                        </page>
                         <page string="Errores" name="errors">
                             <field name="error_log"/>
                         </page>
@@ -57,6 +72,7 @@
         parent="menu_bitrix_root"
         action="action_bitrix_sync_log"
         sequence="20"
+        groups="base.group_system"
     />
 
 </odoo>

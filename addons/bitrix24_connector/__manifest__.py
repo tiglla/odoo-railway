@@ -1,6 +1,6 @@
 {
     "name": "Bitrix24 Connector",
-    "version": "19.0.2.0.0",
+    "version": "19.0.3.0.0",
     "category": "CRM",
     "summary": "Integración directa Odoo 19 con Bitrix24",
     "author": "Custom",
@@ -20,6 +20,7 @@
     "views/bitrix_field_mapping_views.xml",
     "views/bitrix_deal_views.xml",
     "views/construction_project_link_views.xml",
+    "views/bitrix_sync_log_views.xml",
 ],
 
     "external_dependencies": {

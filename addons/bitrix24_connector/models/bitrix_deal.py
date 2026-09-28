@@ -30,6 +30,7 @@ class BitrixDeal(models.Model):
     category_id = fields.Char(string="Categoría (Category ID)")
     opportunity = fields.Float(string="Importe")
     currency_code = fields.Char(string="Moneda Bitrix24", readonly=True)
+    assigned_by_id = fields.Char(string="Vendedor Bitrix24", readonly=True)
 
     partner_id = fields.Many2one("res.partner", string="Contacto")
     company_id = fields.Many2one("res.partner", string="Empresa")
@@ -84,6 +85,7 @@ class BitrixDeal(models.Model):
             "category_id": deal.get("CATEGORY_ID"),
             "opportunity": deal.get("OPPORTUNITY") or 0.0,
             "currency_code": deal.get("CURRENCY_ID") or False,
+            "assigned_by_id": str(deal.get("ASSIGNED_BY_ID") or "") or False,
             "partner_id": self._find_partner(
                 "bitrix_contact_id", contact_id
             ).id or False,
@@ -97,9 +99,8 @@ class BitrixDeal(models.Model):
 
     def _ensure_won_projects(self, config):
         Project = self.env["eigr.construction.project"].sudo()
-        responsible = (
-            config.project_responsible_id
-            or self.env.ref("base.user_admin")
+        default_responsible = config.project_responsible_id or self.env.ref(
+            "base.user_admin"
         )
         created = 0
         errors = []
@@ -110,6 +111,10 @@ class BitrixDeal(models.Model):
             ("project_id", "=", False),
         ])
         for deal in won_deals:
+            mapping = config.sudo().user_mapping_ids.filtered(
+                lambda item: item.bitrix_user_id == deal.assigned_by_id
+            )[:1]
+            responsible = mapping.user_id if mapping else default_responsible
             project = Project.with_context(active_test=False).search([
                 ("bitrix_deal_id", "=", deal.bitrix_deal_id),
             ], limit=1)
@@ -187,12 +192,16 @@ class BitrixDeal(models.Model):
         updated = 0
         exported = 0
 
+        if config is None:
+            config = self._get_bitrix_config()
+        deals_cutoff = fields.Datetime.now()
+
         try:
-            deals = api.get_deals()
+            deals = api.get_deals(config._pull_filter(config.deals_cursor))
         except Exception as error:
             if quiet:
                 _logger.error("Bitrix24: fallo obteniendo deals: %s", error)
-                return imported, updated, exported, 0, []
+                return imported, updated, exported, 0, 0, []
             raise
 
         deals_by_id = {
@@ -223,6 +232,7 @@ class BitrixDeal(models.Model):
                 "category_id": existing.category_id or False,
                 "opportunity": existing.opportunity or 0.0,
                 "currency_code": existing.currency_code or False,
+                "assigned_by_id": existing.assigned_by_id or False,
                 "partner_id": existing.partner_id.id or False,
                 "company_id": existing.company_id.id or False,
             }
@@ -234,6 +244,7 @@ class BitrixDeal(models.Model):
                 "category_id": values.get("category_id") or False,
                 "opportunity": values.get("opportunity") or 0.0,
                 "currency_code": values.get("currency_code") or False,
+                "assigned_by_id": values.get("assigned_by_id") or False,
                 "partner_id": values.get("partner_id") or False,
                 "company_id": values.get("company_id") or False,
             }
@@ -247,8 +258,7 @@ class BitrixDeal(models.Model):
             ))
             updated += 1
 
-        if config is None:
-            config = self._get_bitrix_config()
+        config.deals_cursor = deals_cutoff
         projects_created, project_errors = self._ensure_won_projects(config)
 
         if not api:
@@ -274,10 +284,30 @@ class BitrixDeal(models.Model):
                 payload["COMPANY_ID"] = int(
                     deal.company_id.bitrix_company_id
                 )
-            new_id = api.create_deal(payload)
-            if new_id:
+            originator = config._originator_id()
+            origin_id = f"deal_{deal.id}"
+            payload.update({
+                "ORIGINATOR_ID": originator,
+                "ORIGIN_ID": origin_id,
+            })
+            success, new_id, error = config._push_record(
+                deal, "crm.deal.add", payload,
+                lambda: api.find_by_origin("deal", originator, origin_id)
+                or api.create_deal(payload),
+            )
+            if error:
+                project_errors.append(f"Negocio Odoo {deal.id}: {error}")
+            elif success:
                 deal.bitrix_deal_id = str(new_id)
                 deal.bitrix_last_sync = fields.Datetime.now()
                 exported += 1
 
-        return imported, updated, exported, projects_created, project_errors
+        projects_exported, export_errors = self.env[
+            "eigr.construction.project"
+        ].sync_progress_with_bitrix(api, config)
+        project_errors.extend(export_errors)
+
+        return (
+            imported, updated, exported, projects_created,
+            projects_exported, project_errors,
+        )

@@ -36,6 +36,10 @@
                             type="object"
                             string="Importar contactos"
                             class="btn-secondary"/>
+                    <button name="action_setup_project_fields"
+                            type="object"
+                            string="Preparar campos de obra en Bitrix24"
+                            groups="base.group_system"/>
                 </header>
 
                 <sheet>
@@ -48,6 +52,32 @@
                         <field name="project_responsible_id"/>
                         <field name="last_sync" readonly="True"/>
                     </group>
+
+                    <notebook>
+                        <page string="Avance de obras" groups="base.group_system">
+                            <group string="Campos personalizados del negocio en Bitrix24">
+                                <field name="deal_field_project_code" placeholder="UF_CRM_..."/>
+                                <field name="deal_field_project_state" placeholder="UF_CRM_..."/>
+                                <field name="deal_field_project_progress" placeholder="UF_CRM_..."/>
+                                <field name="deal_field_project_end_date" placeholder="UF_CRM_..."/>
+                            </group>
+                        </page>
+                        <page string="Responsables" groups="base.group_system">
+                            <field name="user_mapping_ids">
+                                <list editable="bottom">
+                                    <field name="bitrix_user_id"/>
+                                    <field name="user_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Sincronización incremental" groups="base.group_system">
+                            <group>
+                                <field name="contacts_cursor" readonly="1"/>
+                                <field name="companies_cursor" readonly="1"/>
+                                <field name="deals_cursor" readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
 
                 </sheet>
             </form>

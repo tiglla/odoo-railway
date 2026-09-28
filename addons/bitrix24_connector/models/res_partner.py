@@ -166,13 +166,14 @@ class ResPartner(models.Model):
 
             if not partner:
 
-                self.create(dict(
+                partner = self.create(dict(
                     values,
                     bitrix_contact_id=bitrix_id,
                     bitrix_last_sync=fields.Datetime.now(),
                 ))
 
                 imported += 1
+                pulled_ids.add(partner.id)
 
                 continue
 
@@ -201,10 +202,10 @@ class ResPartner(models.Model):
         return imported, updated, pulled_ids
 
     def _push_bitrix_contacts(
-        self, api, contacts_by_id, pulled_ids
+        self, api, contacts_by_id, pulled_ids, config
     ):
 
-        domain = [("type", "=", "contact")]
+        domain = [("type", "=", "contact"), ("is_company", "=", False)]
 
         if pulled_ids:
 
@@ -212,10 +213,23 @@ class ResPartner(models.Model):
                 ("id", "not in", list(pulled_ids))
             )
 
+        if config.last_sync:
+            domain += ["|", ("bitrix_contact_id", "=", False),
+                       ("write_date", ">", config.last_sync)]
+        candidates = self.search(domain)
+        due_ids = config._due_retry_ids("res.partner", "crm.contact")
+        if due_ids:
+            candidates |= self.search([
+                ("type", "=", "contact"), ("is_company", "=", False),
+                ("id", "in", due_ids)
+            ])
+
         exported = 0
         errors = []
 
-        for partner in self.search(domain):
+        for partner in candidates:
+            if partner.id in pulled_ids:
+                continue
 
             values = self._odoo_to_sync_values(partner)
             bitrix_id = partner.bitrix_contact_id
@@ -227,20 +241,28 @@ class ResPartner(models.Model):
                 ):
                     continue
 
-            elif bitrix_id:
-
-                bitrix_id = False
-
             payload = self._odoo_values_to_bitrix(values)
 
-            try:
-                if bitrix_id:
-                    api.update_contact(bitrix_id, payload)
-                else:
-                    new_id = api.create_contact(payload)
-                    if new_id:
-                        partner.bitrix_contact_id = str(new_id)
-            except Exception as error:
+            if not bitrix_id:
+                originator = config._originator_id()
+                origin_id = f"contact_{partner.id}"
+                payload.update({
+                    "ORIGINATOR_ID": originator,
+                    "ORIGIN_ID": origin_id,
+                })
+
+            operation = "crm.contact.update" if bitrix_id else "crm.contact.add"
+            send = (
+                (lambda: api.update_contact(bitrix_id, payload))
+                if bitrix_id else (
+                    lambda: api.find_by_origin("contact", originator, origin_id)
+                    or api.create_contact(payload)
+                )
+            )
+            success, result, error = config._push_record(
+                partner, operation, payload, send
+            )
+            if error:
                 message = (
                     f"Contacto Odoo {partner.id} ({partner.name}), "
                     f"correo {partner.email or 'vacío'}: {error}"
@@ -248,6 +270,11 @@ class ResPartner(models.Model):
                 _logger.warning("Bitrix24: %s", message)
                 errors.append(message)
                 continue
+            if not success:
+                continue
+
+            if not bitrix_id:
+                partner.bitrix_contact_id = str(result)
 
             partner.bitrix_last_sync = fields.Datetime.now()
 
@@ -259,7 +286,8 @@ class ResPartner(models.Model):
 
         api = BitrixAPI(config.webhook_url)
 
-        contacts = api.get_contacts()
+        contacts_cutoff = fields.Datetime.now()
+        contacts = api.get_contacts(config._pull_filter(config.contacts_cursor))
 
         contacts_by_id = {
             str(contact.get("ID")): contact
@@ -270,16 +298,17 @@ class ResPartner(models.Model):
         imported, updated, pulled_ids = (
             self._pull_bitrix_contacts(contacts_by_id)
         )
+        config.contacts_cursor = contacts_cutoff
 
         exported, contact_errors = self._push_bitrix_contacts(
-            api, contacts_by_id, pulled_ids
+            api, contacts_by_id, pulled_ids, config
         )
 
         companies_imported, companies_updated, companies_exported, company_errors = (
-            self.sync_companies_with_bitrix(api)
+            self.sync_companies_with_bitrix(api, config)
         )
 
-        deals_imported, deals_updated, deals_exported, projects_created, project_errors = (
+        deals_imported, deals_updated, deals_exported, projects_created, projects_exported, project_errors = (
             self.env["bitrix.deal"].sync_deals_with_bitrix(
                 api, quiet=False, config=config
             )
@@ -298,6 +327,7 @@ class ResPartner(models.Model):
             "deals_updated": deals_updated,
             "deals_exported": deals_exported,
             "projects_created": projects_created,
+            "projects_exported": projects_exported,
             "sync_errors": contact_errors + company_errors + project_errors,
         }
 
@@ -416,13 +446,14 @@ class ResPartner(models.Model):
 
             if not partner:
 
-                self.create(dict(
+                partner = self.create(dict(
                     values,
                     bitrix_company_id=bitrix_id,
                     bitrix_last_sync=fields.Datetime.now(),
                 ))
 
                 imported += 1
+                pulled_ids.add(partner.id)
                 continue
 
             if self._company_to_odoo_sync(partner) == values:
@@ -449,19 +480,36 @@ class ResPartner(models.Model):
 
         return imported, updated, pulled_ids
 
-    def _push_bitrix_companies(self, api, pulled_ids):
+    def _push_bitrix_companies(self, api, companies_by_id, pulled_ids, config):
 
         domain = [("is_company", "=", True)]
 
         if pulled_ids:
             domain.append(("id", "not in", list(pulled_ids)))
 
+        if config.last_sync:
+            domain += ["|", ("bitrix_company_id", "=", False),
+                       ("write_date", ">", config.last_sync)]
+        candidates = self.search(domain)
+        due_ids = config._due_retry_ids("res.partner", "crm.company")
+        if due_ids:
+            candidates |= self.search([
+                ("is_company", "=", True), ("id", "in", due_ids)
+            ])
+
         exported = 0
         errors = []
 
-        for partner in self.search(domain):
+        for partner in candidates:
+            if partner.id in pulled_ids:
+                continue
 
             bitrix_id = partner.bitrix_company_id
+            if bitrix_id and bitrix_id in companies_by_id:
+                if self._company_to_odoo_sync(partner) == self._bitrix_to_odoo_company(
+                    companies_by_id[bitrix_id]
+                ):
+                    continue
             payload = {"TITLE": partner.name or ""}
 
             if partner.phone:
@@ -474,14 +522,26 @@ class ResPartner(models.Model):
                     {"VALUE": partner.email, "VALUE_TYPE": "WORK"}
                 ]
 
-            try:
-                if bitrix_id:
-                    api.update_company(bitrix_id, payload)
-                else:
-                    new_id = api.create_company(payload)
-                    if new_id:
-                        partner.bitrix_company_id = str(new_id)
-            except Exception as error:
+            if not bitrix_id:
+                originator = config._originator_id()
+                origin_id = f"company_{partner.id}"
+                payload.update({
+                    "ORIGINATOR_ID": originator,
+                    "ORIGIN_ID": origin_id,
+                })
+
+            operation = "crm.company.update" if bitrix_id else "crm.company.add"
+            send = (
+                (lambda: api.update_company(bitrix_id, payload))
+                if bitrix_id else (
+                    lambda: api.find_by_origin("company", originator, origin_id)
+                    or api.create_company(payload)
+                )
+            )
+            success, result, error = config._push_record(
+                partner, operation, payload, send
+            )
+            if error:
                 message = (
                     f"Empresa Odoo {partner.id} ({partner.name}), "
                     f"correo {partner.email or 'vacío'}: {error}"
@@ -489,22 +549,33 @@ class ResPartner(models.Model):
                 _logger.warning("Bitrix24: %s", message)
                 errors.append(message)
                 continue
+            if not success:
+                continue
+
+            if not bitrix_id:
+                partner.bitrix_company_id = str(result)
 
             partner.bitrix_last_sync = fields.Datetime.now()
             exported += 1
 
         return exported, errors
 
-    def sync_companies_with_bitrix(self, api):
+    def sync_companies_with_bitrix(self, api, config):
 
-        companies = api.get_companies()
+        companies_cutoff = fields.Datetime.now()
+        companies = api.get_companies(config._pull_filter(config.companies_cursor))
+        companies_by_id = {
+            str(company.get("ID")): company
+            for company in companies if company.get("ID")
+        }
 
         imported, updated, pulled_ids = (
             self._pull_bitrix_companies(companies)
         )
+        config.companies_cursor = companies_cutoff
 
         exported, errors = self._push_bitrix_companies(
-            api, pulled_ids
+            api, companies_by_id, pulled_ids, config
         )
 
         return imported, updated, exported, errors

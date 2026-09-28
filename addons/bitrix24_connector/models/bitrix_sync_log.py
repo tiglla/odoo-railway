@@ -20,6 +20,7 @@ class BitrixSyncLog(models.Model):
     run_datetime = fields.Datetime(
         string="Fecha de ejecución",
         readonly=True,
+        default=fields.Datetime.now,
     )
 
     direction = fields.Selection(
@@ -46,6 +47,41 @@ class BitrixSyncLog(models.Model):
     failed = fields.Integer(string="Fallidos", readonly=True)
 
     error_log = fields.Text(string="Errores", readonly=True)
+
+    resource_model = fields.Char(string="Modelo Odoo", readonly=True, index=True)
+    resource_id = fields.Integer(string="ID Odoo", readonly=True, index=True)
+    operation = fields.Char(string="Operación Bitrix24", readonly=True)
+    payload_json = fields.Text(string="Datos enviados", readonly=True)
+    status = fields.Selection(
+        [
+            ("success", "Enviado"),
+            ("failed", "Fallido"),
+            ("retried", "Reintentado"),
+            ("discarded", "Registro eliminado"),
+        ],
+        string="Estado",
+        readonly=True,
+        index=True,
+    )
+    attempts = fields.Integer(string="Intentos", readonly=True)
+    next_retry = fields.Datetime(string="Próximo reintento", readonly=True)
+
+    @api.model
+    def discard_missing_retries(self, config):
+        logs = self.sudo().search([
+            ("config_id", "=", config.id),
+            ("status", "=", "failed"),
+            ("next_retry", "<=", fields.Datetime.now()),
+        ])
+        for log in logs:
+            try:
+                exists = self.env[log.resource_model].sudo().browse(
+                    log.resource_id
+                ).exists()
+            except KeyError:
+                exists = False
+            if not exists:
+                log.write({"status": "discarded"})
 
     @api.depends("direction", "run_datetime")
     def _compute_name(self):
