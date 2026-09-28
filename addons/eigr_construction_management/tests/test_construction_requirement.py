@@ -134,3 +134,26 @@ class TestEigrConstructionRequirement(TransactionCase):
         requirement.action_approve()
         with self.assertRaises(UserError):
             requirement.action_mark_ordered()
+
+    def test_purchase_order_syncs_confirmed_quantities(self):
+        product = self.env["product.product"].create({
+            "name": "Material EIGR para compra", "purchase_ok": True,
+        })
+        requirement = self.Requirement.create(self._requirement_values())
+        requirement.line_ids.product_id = product
+        requirement.action_submit()
+        requirement.action_approve()
+        requirement.vendor_id = self.vendor
+        action = requirement.action_create_purchase_order()
+        order = self.env["purchase.order"].browse(action["res_id"])
+        self.assertEqual(requirement.purchase_order_id, order)
+        self.assertEqual(requirement.line_ids.purchase_line_id.order_id, order)
+        with self.assertRaises(UserError):
+            requirement.line_ids.quantity_received = 1
+        order.button_confirm()
+        self.assertEqual(requirement.state, "ordered")
+        self.assertEqual(requirement.purchase_reference, order.name)
+        self.assertEqual(requirement.line_ids.quantity_ordered, 10)
+        order.button_cancel()
+        self.assertFalse(requirement.purchase_order_id)
+        self.assertEqual(requirement.state, "approved")

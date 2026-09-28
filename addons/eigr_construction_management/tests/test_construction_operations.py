@@ -76,3 +76,40 @@ class TestEigrConstructionOperations(TransactionCase):
             self.team_user
         ).search([("id", "=", document.id)])
         self.assertFalse(visible)
+
+    def test_schedule_predecessor_and_delay(self):
+        Schedule = self.env["eigr.construction.schedule"]
+        first = Schedule.create({
+            "project_id": self.project.id, "name": "Primera etapa",
+            "start_date": "2026-01-01", "end_date": "2026-01-10",
+            "is_milestone": True, "responsible_id": self.planner.id,
+        })
+        second = Schedule.create({
+            "project_id": self.project.id, "name": "Segunda etapa",
+            "start_date": "2026-01-11", "end_date": "2026-01-20",
+            "predecessor_id": first.id,
+        })
+        with self.assertRaises(UserError):
+            second.action_complete()
+        first.action_complete()
+        second.action_complete()
+        self.assertEqual(second.actual_percent, 100)
+        self.assertTrue(second.completion_date)
+        with self.assertRaises(ValidationError):
+            first.predecessor_id = second
+
+    def test_client_photo_approval_resets_after_file_change(self):
+        document = self.env["eigr.construction.document"].create({
+            "project_id": self.project.id, "name": "Fotos de avance",
+        })
+        with self.assertRaises(UserError):
+            document.action_approve_for_client()
+        attachment = self.env["ir.attachment"].create({
+            "name": "obra.png", "type": "binary", "datas": "YQ==",
+            "mimetype": "image/png",
+        })
+        document.attachment_ids = [Command.link(attachment.id)]
+        document.action_approve_for_client()
+        self.assertTrue(document.client_approved)
+        document.attachment_ids = [Command.clear()]
+        self.assertFalse(document.client_approved)

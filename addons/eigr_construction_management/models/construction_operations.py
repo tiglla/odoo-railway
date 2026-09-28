@@ -118,7 +118,7 @@ class EigrConstructionTechnicalFile(models.Model):
 class EigrConstructionSchedule(models.Model):
     _name = "eigr.construction.schedule"
     _description = "Cronograma de obra EIGR"
-    _inherit = ["eigr.construction.operation", "mail.thread"]
+    _inherit = ["eigr.construction.operation", "mail.thread", "mail.activity.mixin"]
     _order = "start_date, id"
 
     name = fields.Char(string="Actividad", required=True, tracking=True)
@@ -128,6 +128,55 @@ class EigrConstructionSchedule(models.Model):
     weight_percent = fields.Float(string="Peso (%)")
     planned_percent = fields.Float(string="Avance planificado (%)")
     actual_percent = fields.Float(string="Avance real (%)")
+    responsible_id = fields.Many2one("res.users", string="Responsable", check_company=True)
+    is_milestone = fields.Boolean(string="Hito")
+    predecessor_id = fields.Many2one(
+        "eigr.construction.schedule", string="Actividad predecesora", ondelete="restrict",
+    )
+    completion_date = fields.Date(string="Fecha de terminación", readonly=True)
+    delay_days = fields.Integer(string="Días de atraso", compute="_compute_delay")
+
+    @api.depends("end_date", "actual_percent", "completion_date")
+    def _compute_delay(self):
+        today = fields.Date.context_today(self)
+        for record in self:
+            cutoff = record.completion_date or today
+            record.delay_days = max((cutoff - record.end_date).days, 0) if (
+                record.end_date and (record.actual_percent < 100 or record.completion_date)
+            ) else 0
+
+    @api.constrains("predecessor_id", "project_id")
+    def _check_predecessor(self):
+        for record in self:
+            predecessor = record.predecessor_id
+            visited = {record.id}
+            while predecessor:
+                if predecessor.project_id != record.project_id:
+                    raise ValidationError("La actividad predecesora debe pertenecer a la misma obra.")
+                if predecessor.id in visited:
+                    raise ValidationError("El cronograma no puede tener dependencias circulares.")
+                visited.add(predecessor.id)
+                predecessor = predecessor.predecessor_id
+
+    def write(self, vals):
+        if "actual_percent" in vals:
+            if vals["actual_percent"] == 100:
+                if any(record.predecessor_id and record.predecessor_id.actual_percent < 100
+                       for record in self):
+                    raise UserError("Complete primero la actividad predecesora.")
+                vals = {**vals, "completion_date": fields.Date.context_today(self)}
+            elif any(record.completion_date for record in self):
+                vals = {**vals, "completion_date": False}
+        return super().write(vals)
+
+    def action_complete(self):
+        if not self.env.user.has_group("eigr_construction_management.group_eigr_planner"):
+            raise AccessError("Solo Planeamiento puede completar actividades del cronograma.")
+        for record in self:
+            if record.predecessor_id and record.predecessor_id.actual_percent < 100:
+                raise UserError("Complete primero la actividad predecesora.")
+            record.write({"actual_percent": 100, "completion_date": fields.Date.context_today(record)})
+        return True
 
     @api.constrains("start_date", "end_date", "weight_percent", "planned_percent", "actual_percent")
     def _check_schedule(self):
@@ -209,3 +258,22 @@ class EigrConstructionDocument(models.Model):
     ], required=True, default="other")
     reference = fields.Char(string="Referencia")
     attachment_ids = fields.Many2many("ir.attachment", string="Archivos")
+    client_approved = fields.Boolean(string="Aprobado para informe al cliente", readonly=True)
+
+    def action_approve_for_client(self):
+        if not self.env.user.has_group(
+            "eigr_construction_management.group_eigr_manager"
+        ):
+            raise AccessError("Solo el Jefe de Control aprueba imágenes para el cliente.")
+        self.check_access("read")
+        if any(not record.attachment_ids.filtered(
+            lambda attachment: attachment.mimetype and attachment.mimetype.startswith("image/")
+        ) for record in self):
+            raise UserError("Adjunte una imagen antes de aprobar el documento.")
+        self.sudo().write({"client_approved": True})
+        return True
+
+    def write(self, vals):
+        if "attachment_ids" in vals:
+            vals = {**vals, "client_approved": False}
+        return super().write(vals)

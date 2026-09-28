@@ -60,7 +60,23 @@
                                 <field name="deal_field_project_state" placeholder="UF_CRM_..."/>
                                 <field name="deal_field_project_progress" placeholder="UF_CRM_..."/>
                                 <field name="deal_field_project_end_date" placeholder="UF_CRM_..."/>
+                                <field name="deal_field_next_milestone" placeholder="UF_CRM_..."/>
+                                <field name="deal_field_milestone_date" placeholder="UF_CRM_..."/>
+                                <field name="deal_field_delay_days" placeholder="UF_CRM_..."/>
+                                <field name="deal_field_progress_update" placeholder="UF_CRM_..."/>
+                                <field name="deal_field_client_contact" placeholder="UF_CRM_..."/>
+                                <field name="client_notification_mode"/>
                             </group>
+                        </page>
+                        <page string="Eventos Bitrix24" groups="base.group_system">
+                            <group string="Webhook saliente del portal">
+                                <field name="event_member_id"/>
+                                <field name="event_application_token" password="True"/>
+                            </group>
+                            <div class="alert alert-info" role="alert">
+                                Configure en Bitrix24 los eventos OnCrmDealAdd y OnCrmDealUpdate
+                                hacia https://SU-DOMINIO/bitrix24/events/deal.
+                            </div>
                         </page>
                         <page string="Responsables" groups="base.group_system">
                             <field name="user_mapping_ids">

@@ -287,6 +287,8 @@ class EigrConstructionRequirement(models.Model):
         return True
 
     def write(self, vals):
+        if self.env.su and self.env.context.get("eigr_purchase_sync"):
+            return super().write(vals)
         if (
             not self.env.su
             and not self.env.user.has_group(
@@ -457,6 +459,8 @@ class EigrConstructionRequirementLine(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
+        if self.env.su and self.env.context.get("eigr_purchase_sync"):
+            return super().write(vals)
         for line in self:
             state = line.requirement_id.state
             changed = set(vals)

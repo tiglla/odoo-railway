@@ -51,6 +51,19 @@ class BitrixConfig(models.Model):
     deal_field_project_state = fields.Char(string="Campo Bitrix: estado de obra")
     deal_field_project_progress = fields.Char(string="Campo Bitrix: avance físico")
     deal_field_project_end_date = fields.Char(string="Campo Bitrix: fecha prevista")
+    deal_field_next_milestone = fields.Char(string="Campo Bitrix: próximo hito")
+    deal_field_milestone_date = fields.Char(string="Campo Bitrix: fecha del hito")
+    deal_field_delay_days = fields.Char(string="Campo Bitrix: días de atraso")
+    deal_field_progress_update = fields.Char(string="Campo Bitrix: última actualización")
+    deal_field_client_contact = fields.Char(string="Campo Bitrix: último aviso al cliente")
+    event_member_id = fields.Char(string="Member ID del portal Bitrix24", groups="base.group_system")
+    event_application_token = fields.Char(
+        string="Token de eventos salientes", groups="base.group_system", copy=False,
+    )
+    client_notification_mode = fields.Selection([
+        ("odoo", "Correo desde Odoo"),
+        ("bitrix", "Automatización en Bitrix24"),
+    ], default="odoo", required=True, string="Avisos de avance al cliente")
 
     user_mapping_ids = fields.One2many(
         "bitrix.user.mapping", "config_id", string="Vendedores y responsables"
@@ -147,6 +160,11 @@ class BitrixConfig(models.Model):
             ("deal_field_project_state", "EIGR_OBRA_ESTADO", "string", "Estado de obra EIGR"),
             ("deal_field_project_progress", "EIGR_OBRA_AVANCE", "double", "Avance físico EIGR (%)"),
             ("deal_field_project_end_date", "EIGR_OBRA_FIN", "date", "Fin previsto de obra EIGR"),
+            ("deal_field_next_milestone", "EIGR_PROXIMO_HITO", "string", "Próximo hito EIGR"),
+            ("deal_field_milestone_date", "EIGR_FECHA_HITO", "date", "Fecha del próximo hito EIGR"),
+            ("deal_field_delay_days", "EIGR_DIAS_ATRASO", "integer", "Días de atraso EIGR"),
+            ("deal_field_progress_update", "EIGR_ACTUALIZACION", "datetime", "Última actualización EIGR"),
+            ("deal_field_client_contact", "EIGR_AVISO_CLIENTE", "date", "Último aviso al cliente EIGR"),
         ]
         try:
             existing = {
@@ -178,7 +196,7 @@ class BitrixConfig(models.Model):
             "tag": "display_notification",
             "params": {
                 "title": _("Bitrix24"),
-                "message": _("Los cuatro campos de avance de obra están configurados."),
+                "message": _("Los nueve campos de avance de obra están configurados."),
                 "type": "success",
             },
         }

@@ -33,6 +33,12 @@ class TestEigrConstructionAlerts(TransactionCase):
             "start_date": today - timedelta(days=2),
             "target_date": today - timedelta(days=1),
         })
+        milestone = self.env["eigr.construction.schedule"].create({
+            "name": "Hito pendiente", "project_id": project.id,
+            "responsible_id": admin.id, "is_milestone": True,
+            "start_date": today - timedelta(days=3),
+            "end_date": today - timedelta(days=1),
+        })
         project._cron_update_eigr_activities()
         project._cron_update_eigr_activities()
 
@@ -50,6 +56,12 @@ class TestEigrConstructionAlerts(TransactionCase):
         self.assertEqual(len(approval), 1)
         self.assertEqual(len(closing), 1)
         self.assertEqual(approval.user_id, admin)
+        milestone_alert = Activity.search([
+            ("res_model_id.model", "=", milestone._name),
+            ("res_id", "=", milestone.id),
+            ("summary", "=", "EIGR: hito o actividad atrasada"),
+        ])
+        self.assertEqual(len(milestone_alert), 1)
 
         requirement.write({
             "state": "ordered",
@@ -66,6 +78,8 @@ class TestEigrConstructionAlerts(TransactionCase):
 
         requirement.write({"state": "received"})
         closure.write({"state": "approved"})
+        milestone.action_complete()
         project._cron_update_eigr_activities()
         self.assertFalse(delivery.exists())
         self.assertFalse(closing.exists())
+        self.assertFalse(milestone_alert.exists())

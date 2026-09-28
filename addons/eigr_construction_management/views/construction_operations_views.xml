@@ -71,6 +71,10 @@
                 <field name="name"/>
                 <field name="start_date"/>
                 <field name="end_date"/>
+                <field name="is_milestone"/>
+                <field name="responsible_id"/>
+                <field name="predecessor_id"/>
+                <field name="delay_days" decoration-danger="delay_days &gt; 0"/>
                 <field name="weight_percent"/>
                 <field name="planned_percent"/>
                 <field name="actual_percent"/>
@@ -82,6 +86,7 @@
         <field name="model">eigr.construction.schedule</field>
         <field name="arch" type="xml">
             <form string="Actividad del cronograma">
+                <header><button name="action_complete" type="object" string="Completar" class="btn-primary" groups="eigr_construction_management.group_eigr_planner" invisible="actual_percent == 100"/></header>
                 <sheet>
                     <group>
                         <field name="project_id"/>
@@ -89,6 +94,11 @@
                         <field name="name"/>
                         <field name="start_date"/>
                         <field name="end_date"/>
+                        <field name="is_milestone"/>
+                        <field name="responsible_id"/>
+                        <field name="predecessor_id" domain="[('project_id', '=', project_id), ('id', '!=', id)]"/>
+                        <field name="completion_date" readonly="1"/>
+                        <field name="delay_days" readonly="1"/>
                         <field name="weight_percent"/>
                         <field name="planned_percent"/>
                         <field name="actual_percent"/>
@@ -163,6 +173,7 @@
                 <field name="name"/>
                 <field name="doc_type"/>
                 <field name="reference"/>
+                <field name="client_approved"/>
             </list>
         </field>
     </record>
@@ -171,6 +182,7 @@
         <field name="model">eigr.construction.document</field>
         <field name="arch" type="xml">
             <form string="Documento de obra">
+                <header><button name="action_approve_for_client" type="object" string="Aprobar para cliente" groups="eigr_construction_management.group_eigr_manager" invisible="client_approved"/></header>
                 <sheet>
                     <group>
                         <field name="project_id"/>
@@ -178,6 +190,7 @@
                         <field name="name"/>
                         <field name="doc_type"/>
                         <field name="reference"/>
+                        <field name="client_approved" readonly="1"/>
                     </group>
                     <field name="attachment_ids" widget="many2many_binary"/>
                     <field name="notes"/>

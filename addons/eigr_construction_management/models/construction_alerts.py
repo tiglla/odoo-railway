@@ -4,6 +4,7 @@ from odoo import api, fields, models
 REQUIREMENT_APPROVAL = "EIGR: aprobar requerimiento"
 DELIVERY_OVERDUE = "EIGR: entrega de requerimiento atrasada"
 CLOSURE_OVERDUE = "EIGR: completar expediente de cierre"
+SCHEDULE_OVERDUE = "EIGR: hito o actividad atrasada"
 
 
 class EigrConstructionProjectAlerts(models.Model):
@@ -96,4 +97,17 @@ class EigrConstructionProjectAlerts(models.Model):
                 and closure.state in ("draft", "review")
                 and closure.target_date <= today
                 and closure.completion_percent < 100,
+            )
+
+        schedules = self.env["eigr.construction.schedule"].sudo().search([])
+        for schedule in schedules:
+            self._sync_eigr_activity(
+                schedule,
+                SCHEDULE_OVERDUE,
+                schedule.responsible_id or schedule.project_id.planning_engineer_id or admin,
+                schedule.end_date,
+                schedule.project_id.active
+                and schedule.project_id.state not in ("closed", "cancelled")
+                and schedule.actual_percent < 100
+                and schedule.end_date < today,
             )

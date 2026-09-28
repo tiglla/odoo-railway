@@ -8,6 +8,17 @@ from ..services.bitrix_api import BitrixAPI
 
 
 class TestSyncOperations(TransactionCase):
+    def test_timeline_marker_is_found_before_reposting(self):
+        api = BitrixAPI("https://example.test/rest/1/token")
+        api.call = Mock(return_value={"result": [
+            {"ID": "7", "COMMENT": "Avance aprobado\n[EIGR:valuation-42]"},
+        ]})
+        self.assertTrue(api.has_timeline_marker("501", "[EIGR:valuation-42]"))
+        self.assertEqual(
+            api.call.call_args.args[1]["filter"],
+            {"ENTITY_ID": 501, "ENTITY_TYPE": "deal"},
+        )
+
     def test_incremental_filter_is_sent_to_bitrix(self):
         Config = self.env["bitrix.config"]
         cursor = datetime(2026, 9, 28, 12, 0, 0)
@@ -83,6 +94,8 @@ class TestSyncOperations(TransactionCase):
         with patch.object(BitrixAPI, "get_deal_userfields", return_value=[]), \
              patch.object(BitrixAPI, "create_deal_userfield", return_value=1) as create:
             config.action_setup_project_fields()
-        self.assertEqual(create.call_count, 4)
+        self.assertEqual(create.call_count, 9)
         self.assertEqual(config.deal_field_project_code, "UF_CRM_EIGR_OBRA_CODIGO")
         self.assertEqual(config.deal_field_project_progress, "UF_CRM_EIGR_OBRA_AVANCE")
+        self.assertEqual(config.deal_field_next_milestone, "UF_CRM_EIGR_PROXIMO_HITO")
+        self.assertEqual(config.deal_field_progress_update, "UF_CRM_EIGR_ACTUALIZACION")

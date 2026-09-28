@@ -143,4 +143,63 @@
         <field name="binding_type">report</field>
         <field name="print_report_name">'Reporte Ejecutivo - %s' % object.code</field>
     </record>
+    <template id="report_eigr_project_client">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>Informe de avance de obra</h2>
+                        <p><strong t-field="o.name"/> · <span t-field="o.code"/></p>
+                        <table class="table table-sm table-bordered">
+                            <tbody>
+                                <tr><th>Cliente</th><td><span t-field="o.client_id"/></td>
+                                    <th>Ubicación</th><td><span t-field="o.location"/></td></tr>
+                                <tr><th>Fase</th><td><span t-field="o.state"/></td>
+                                    <th>Avance físico</th><td><span t-esc="'{:.2f}%'.format(o.progress_percent)"/></td></tr>
+                                <tr><th>Inicio previsto</th><td><span t-field="o.planned_start_date"/></td>
+                                    <th>Fin previsto</th><td><span t-field="o.planned_end_date"/></td></tr>
+                            </tbody>
+                        </table>
+                        <t t-if="o.latest_valuation_id">
+                            <h4>Última medición aprobada</h4>
+                            <p>Fecha de corte: <span t-field="o.latest_valuation_id.cutoff_date"/> ·
+                               Avance ejecutado: <span t-esc="'{:.2f}%'.format(o.latest_valuation_id.actual_progress)"/></p>
+                        </t>
+                        <h4>Hitos y actividades</h4>
+                        <table class="table table-sm table-bordered">
+                            <thead><tr><th>Actividad</th><th>Responsable</th><th>Fecha prevista</th><th>Avance</th></tr></thead>
+                            <tbody>
+                                <tr t-foreach="o.schedule_ids.sorted('end_date')" t-as="item">
+                                    <td><span t-field="item.name"/></td>
+                                    <td><span t-field="item.responsible_id"/></td>
+                                    <td><span t-field="item.end_date"/></td>
+                                    <td><span t-esc="'{:.0f}%'.format(item.actual_percent)"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <t t-if="o.get_client_photos()">
+                            <h4>Fotografías registradas</h4>
+                            <t t-foreach="o.get_client_photos()" t-as="photo">
+                                <div class="mb-3">
+                                    <img t-att-src="image_data_uri(photo.datas)" style="max-width:90%;max-height:220px;"/>
+                                    <p><span t-field="photo.name"/></p>
+                                </div>
+                            </t>
+                        </t>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="action_report_eigr_project_client" model="ir.actions.report">
+        <field name="name">Informe de Avance para Cliente</field>
+        <field name="model">eigr.construction.project</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">eigr_construction_management.report_eigr_project_client</field>
+        <field name="report_file">eigr_construction_management.report_eigr_project_client</field>
+        <field name="binding_model_id" ref="model_eigr_construction_project"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">'Avance de obra - %s' % object.code</field>
+    </record>
 </odoo>

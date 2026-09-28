@@ -38,7 +38,7 @@
         <field name="name">Jefe de Control</field>
         <field name="sequence">50</field>
         <field name="privilege_id" ref="privilege_eigr_construction"/>
-        <field name="implied_ids" eval="[(4, ref('group_eigr_user'))]"/>
+        <field name="implied_ids" eval="[(4, ref('group_eigr_user')), (4, ref('purchase.group_purchase_user'))]"/>
         <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
     </record>
 

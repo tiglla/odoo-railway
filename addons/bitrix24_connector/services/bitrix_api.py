@@ -205,9 +205,34 @@ class BitrixAPI:
 
         return self._add("crm.deal.add", values)
 
+    def get_deal(self, bitrix_id):
+        return self.call("crm.deal.get", {"id": bitrix_id}).get("result")
+
     def update_deal(self, bitrix_id, values):
 
         return self._update("crm.deal.update", bitrix_id, values)
+
+    def add_timeline_comment(self, bitrix_id, comment):
+        return self._add("crm.timeline.comment.add", {
+            "ENTITY_ID": int(bitrix_id),
+            "ENTITY_TYPE": "deal",
+            "COMMENT": comment,
+        })
+
+    def has_timeline_marker(self, bitrix_id, marker):
+        start = 0
+        while True:
+            data = self.call("crm.timeline.comment.list", {
+                "filter": {"ENTITY_ID": int(bitrix_id), "ENTITY_TYPE": "deal"},
+                "select": ["ID", "COMMENT"],
+                "start": start,
+            })
+            comments = data.get("result") or []
+            if any(marker in (item.get("COMMENT") or "") for item in comments):
+                return True
+            if len(comments) < self.PAGE_SIZE:
+                return False
+            start = data.get("next") or start + self.PAGE_SIZE
 
     def get_deal_userfields(self):
 

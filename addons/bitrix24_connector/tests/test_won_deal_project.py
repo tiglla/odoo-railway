@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from odoo import Command
 from odoo.tests.common import TransactionCase
@@ -28,6 +28,7 @@ class TestWonDealProject(TransactionCase):
         contact_id=None, currency=None, assigned_by=None
     ):
         api = Mock()
+        api.has_timeline_marker.return_value = False
         api.get_deal_userfields.return_value = [
             {"FIELD_NAME": name, "USER_TYPE_ID": field_type}
             for name, field_type in (
@@ -35,6 +36,11 @@ class TestWonDealProject(TransactionCase):
                 (self.config.deal_field_project_state, "string"),
                 (self.config.deal_field_project_progress, "double"),
                 (self.config.deal_field_project_end_date, "date"),
+                (self.config.deal_field_next_milestone, "string"),
+                (self.config.deal_field_milestone_date, "date"),
+                (self.config.deal_field_delay_days, "integer"),
+                (self.config.deal_field_progress_update, "datetime"),
+                (self.config.deal_field_client_contact, "date"),
             ) if name
         ]
         api.get_deals.return_value = [{
@@ -145,4 +151,51 @@ class TestWonDealProject(TransactionCase):
         self.assertEqual(
             self.last_api.update_deal.call_args.args[1]["UF_CRM_EIGR_PROGRESS"],
             35,
+        )
+
+    def test_milestone_delay_and_phase_comment_are_sent_once(self):
+        self.config.write({
+            "deal_field_next_milestone": "UF_CRM_EIGR_PROXIMO_HITO",
+            "deal_field_milestone_date": "UF_CRM_EIGR_FECHA_HITO",
+            "deal_field_delay_days": "UF_CRM_EIGR_DIAS_ATRASO",
+        })
+        self._sync("S", deal_id="508")
+        project = self.Project.search([("bitrix_deal_id", "=", "508")])
+        self.env["eigr.construction.schedule"].create({
+            "project_id": project.id,
+            "name": "Entrega de estructura",
+            "start_date": "2020-01-01",
+            "end_date": "2020-01-02",
+            "is_milestone": True,
+        })
+        project.state = "startup"
+        self._sync("S", deal_id="508")
+        payload = self.last_api.update_deal.call_args.args[1]
+        self.assertEqual(payload["UF_CRM_EIGR_PROXIMO_HITO"], "Entrega de estructura")
+        self.assertEqual(payload["UF_CRM_EIGR_FECHA_HITO"], "2020-01-02")
+        self.assertGreater(payload["UF_CRM_EIGR_DIAS_ATRASO"], 0)
+        self.last_api.add_timeline_comment.assert_called_once()
+        self._sync("S", deal_id="508")
+        self.last_api.add_timeline_comment.assert_not_called()
+
+    def test_event_fetches_current_won_deal_and_its_company(self):
+        api = Mock()
+        api.get_deal.return_value = {
+            "ID": "509", "TITLE": "Contrato nuevo", "STAGE_SEMANTIC_ID": "S",
+            "COMPANY_ID": "101", "CURRENCY_ID": self.env.company.currency_id.name,
+        }
+        with patch.object(BitrixAPI, "get_deal", return_value=api.get_deal.return_value):
+            self.Deal.sync_deal_event(self.config, "509")
+        self.assertEqual(self.Project.search_count([("bitrix_deal_id", "=", "509")]), 1)
+
+    def test_bitrix_notice_trigger_is_only_sent_in_bitrix_mode(self):
+        self.config.deal_field_progress_update = "UF_CRM_EIGR_ACTUALIZACION"
+        project = self.Project.create({"name": "Obra con aviso", "client_id": self.company.id})
+        project.state = "startup"
+        self.assertNotIn(
+            "UF_CRM_EIGR_ACTUALIZACION", project._bitrix_progress_payload(self.config),
+        )
+        self.config.client_notification_mode = "bitrix"
+        self.assertIn(
+            "UF_CRM_EIGR_ACTUALIZACION", project._bitrix_progress_payload(self.config),
         )

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="eigr_analytic_plan_works" model="account.analytic.plan">
+        <field name="name">Obras EIGR</field>
+        <field name="default_applicability">optional</field>
+    </record>
+</odoo>

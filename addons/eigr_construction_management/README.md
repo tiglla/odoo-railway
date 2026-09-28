@@ -46,3 +46,17 @@ La obra, el cliente y los documentos ficticios solo se instalan si la base de da
 ## Valorizaciones
 
 Apruebe las valorizaciones por fecha de corte, de la más antigua a la más reciente. El módulo impide aprobar una valorización anterior a otra ya aprobada y toma el avance físico de la última valorización aprobada. Al actualizar desde una versión anterior, también corrige el porcentaje de las obras que ya tienen valorizaciones aprobadas.
+
+## Compras y costos contables
+
+El módulo requiere Compras, Inventario y Contabilidad de Odoo. En un requerimiento nuevo, asigne un producto Odoo a cada recurso antes de enviarlo. Tras aprobarlo, seleccione proveedor y pulse **Crear cotización Odoo**. EIGR crea una cuenta analítica para la obra si aún no existe y asigna su distribución a las líneas de compra. Al confirmar la orden, EIGR toma la cantidad y el precio real; al validar recepciones de Inventario, toma las cantidades recibidas. Para servicios o productos con recepción manual, registre la cantidad recibida en la línea de compra. También puede usar **Actualizar desde compra** para reconciliar cambios hechos en Odoo. Las compras antiguas con referencia manual siguen funcionando.
+
+El campo **Compras facturadas** suma los apuntes analíticos de facturas de proveedor publicadas, incluidas notas de crédito. Para que se contabilice un gasto, la factura debe conservar la distribución analítica de la obra. El saldo compara este costo contable con el costo del Presupuesto Meta; los costos capturados manualmente en valorizaciones permanecen como indicador operativo separado.
+
+## Informe para el cliente
+
+El menú de impresión de la obra incluye **Informe de Avance para Cliente** en PDF. Muestra fase, avance físico, última valorización aprobada y cronograma sin presupuestos ni costos internos. El Jefe de Control puede aprobar documentos con imágenes para incluirlos; si se cambian sus archivos, la aprobación se retira. El Responsable General puede usar **Enviar informe al cliente** para abrir un correo con el PDF adjunto y revisarlo antes de enviarlo. Es necesario que el cliente tenga correo y que la instalación pueda generar PDF.
+
+## Hitos y retrasos
+
+El cronograma admite responsable, marca de hito y actividad predecesora. Planeamiento puede completar una actividad cuando su predecesora está terminada. La tarea automática existente crea actividades para hitos o actividades vencidos y retira el aviso al completarlos. Las dependencias circulares o entre obras distintas se rechazan.

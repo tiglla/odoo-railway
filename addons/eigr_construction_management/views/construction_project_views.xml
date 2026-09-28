@@ -62,6 +62,7 @@
                     <button name="action_closing" string="Solicitar cierre" type="object" class="btn-primary" groups="eigr_construction_management.group_eigr_responsible" invisible="state != 'execution'"/>
                     <button name="action_cancel" string="Cancelar" type="object" groups="eigr_construction_management.group_eigr_manager" invisible="state in ('closed', 'cancelled')" confirm="¿Confirma la cancelación de esta obra?"/>
                     <button name="action_reset_draft" string="Volver a borrador" type="object" groups="eigr_construction_management.group_eigr_manager" invisible="state != 'cancelled'"/>
+                    <button name="action_prepare_client_report" string="Enviar informe al cliente" type="object" groups="eigr_construction_management.group_eigr_responsible" invisible="not client_id or state in ('draft', 'cancelled')"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,startup,planning,execution,closing,closed"/>
                 </header>
                 <sheet>
@@ -107,6 +108,16 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Costos contables">
+                            <button name="action_setup_analytic_account" type="object" string="Crear cuenta analítica" invisible="analytic_account_id"/>
+                            <group>
+                                <field name="analytic_account_id"/>
+                                <field name="approved_budget_cost" widget="monetary"/>
+                                <field name="posted_purchase_cost" widget="monetary"/>
+                                <field name="purchase_cost_variance" widget="monetary"/>
+                            </group>
+                            <button name="action_open_purchase_costs" type="object" string="Ver apuntes analíticos" groups="analytic.group_analytic_accounting" invisible="not analytic_account_id"/>
+                        </page>
                         <page string="Equipo responsable">
                             <group>
                                 <group>

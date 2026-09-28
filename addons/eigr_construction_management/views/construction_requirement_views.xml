@@ -60,8 +60,11 @@
                     <button name="action_submit" string="Enviar" type="object" class="btn-primary" invisible="state != 'draft'"/>
                     <button name="action_approve" string="Aprobar" type="object" class="btn-primary" groups="eigr_construction_management.group_eigr_manager" invisible="state != 'submitted'"/>
                     <button name="action_reset_draft" string="Devolver a borrador" type="object" groups="eigr_construction_management.group_eigr_manager" invisible="state != 'submitted'"/>
-                    <button name="action_mark_ordered" string="Confirmar orden" type="object" class="btn-primary" groups="eigr_construction_management.group_eigr_manager" invisible="state != 'approved'"/>
-                    <button name="action_update_receipt" string="Actualizar recepción" type="object" class="btn-primary" invisible="state not in ('ordered', 'partial')"/>
+                    <button name="action_mark_ordered" string="Confirmar orden" type="object" class="btn-primary" groups="eigr_construction_management.group_eigr_manager" invisible="state != 'approved' or purchase_order_id"/>
+                    <button name="action_create_purchase_order" string="Crear cotización Odoo" type="object" class="btn-primary" groups="eigr_construction_management.group_eigr_manager" invisible="state != 'approved' or purchase_order_id"/>
+                    <button name="action_sync_purchase" string="Actualizar desde compra" type="object" invisible="not purchase_order_id or state not in ('approved', 'ordered', 'partial')"/>
+                    <button name="action_view_purchase_order" string="Ver compra Odoo" type="object" groups="eigr_construction_management.group_eigr_manager" invisible="not purchase_order_id"/>
+                    <button name="action_update_receipt" string="Actualizar recepción" type="object" class="btn-primary" invisible="state not in ('ordered', 'partial') or purchase_order_id"/>
                     <button name="action_cancel" string="Cancelar" type="object" groups="eigr_construction_management.group_eigr_manager" invisible="state in ('received', 'cancelled')" confirm="¿Confirma la cancelación del requerimiento?"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,ordered,partial,received"/>
                 </header>
@@ -83,11 +86,12 @@
                             <field name="currency_id" invisible="1"/>
                         </group>
                         <group string="Compra y recepción">
-                            <field name="vendor_id" readonly="state != 'approved'"/>
-                            <field name="purchase_reference" readonly="state != 'approved'"/>
-                            <field name="purchase_date" readonly="state != 'approved'"/>
-                            <field name="expected_delivery_date" readonly="state != 'approved'"/>
-                            <field name="receipt_reference" readonly="state not in ('ordered', 'partial')"/>
+                            <field name="vendor_id" readonly="state != 'approved' or purchase_order_id"/>
+                            <field name="purchase_order_id" invisible="1"/>
+                            <field name="purchase_reference" readonly="state != 'approved' or purchase_order_id"/>
+                            <field name="purchase_date" readonly="state != 'approved' or purchase_order_id"/>
+                            <field name="expected_delivery_date" readonly="state != 'approved' or purchase_order_id"/>
+                            <field name="receipt_reference" readonly="state not in ('ordered', 'partial') or purchase_order_id"/>
                             <field name="receipt_date" invisible="state != 'received'"/>
                             <field name="approved_by_id" widget="many2one_avatar_user" invisible="state in ('draft', 'submitted')"/>
                             <field name="approval_date" invisible="state in ('draft', 'submitted')"/>
@@ -106,15 +110,17 @@
                                     <field name="sequence" widget="handle" readonly="parent.state != 'draft'"/>
                                     <field name="item_type" readonly="parent.state != 'draft'"/>
                                     <field name="name" readonly="parent.state != 'draft'"/>
+                                    <field name="product_id" readonly="parent.state != 'draft'"/>
                                     <field name="specification" optional="show" readonly="parent.state != 'draft'"/>
                                     <field name="unit" readonly="parent.state != 'draft'"/>
                                     <field name="quantity_requested" readonly="parent.state != 'draft'"/>
                                     <field name="estimated_unit_cost" widget="monetary" readonly="parent.state != 'draft'"/>
                                     <field name="estimated_subtotal" widget="monetary" sum="Estimado"/>
-                                    <field name="quantity_ordered" readonly="parent.state != 'approved'"/>
-                                    <field name="actual_unit_cost" widget="monetary" readonly="parent.state != 'approved'"/>
+                                    <field name="quantity_ordered" readonly="parent.state != 'approved' or parent.purchase_order_id"/>
+                                    <field name="actual_unit_cost" widget="monetary" readonly="parent.state != 'approved' or parent.purchase_order_id"/>
                                     <field name="ordered_subtotal" widget="monetary" sum="Ordenado"/>
-                                    <field name="quantity_received" readonly="parent.state not in ('ordered', 'partial')"/>
+                                    <field name="quantity_received" readonly="parent.state not in ('ordered', 'partial') or parent.purchase_order_id"/>
+                                    <field name="purchase_line_id" optional="hide" readonly="1"/>
                                     <field name="received_subtotal" widget="monetary" sum="Recibido" optional="show"/>
                                     <field name="currency_id" column_invisible="True"/>
                                 </list>

@@ -187,7 +187,7 @@ class BitrixDeal(models.Model):
             "res_id": self.project_id.id,
         }
 
-    def sync_deals_with_bitrix(self, api, quiet=True, config=None):
+    def sync_deals_with_bitrix(self, api, quiet=True, config=None, deals_override=None):
         imported = 0
         updated = 0
         exported = 0
@@ -196,13 +196,16 @@ class BitrixDeal(models.Model):
             config = self._get_bitrix_config()
         deals_cutoff = fields.Datetime.now()
 
-        try:
-            deals = api.get_deals(config._pull_filter(config.deals_cursor))
-        except Exception as error:
-            if quiet:
-                _logger.error("Bitrix24: fallo obteniendo deals: %s", error)
-                return imported, updated, exported, 0, 0, []
-            raise
+        if deals_override is not None:
+            deals = deals_override
+        else:
+            try:
+                deals = api.get_deals(config._pull_filter(config.deals_cursor))
+            except Exception as error:
+                if quiet:
+                    _logger.error("Bitrix24: fallo obteniendo deals: %s", error)
+                    return imported, updated, exported, 0, 0, []
+                raise
 
         deals_by_id = {
             str(deal.get("ID")): deal
@@ -258,8 +261,12 @@ class BitrixDeal(models.Model):
             ))
             updated += 1
 
-        config.deals_cursor = deals_cutoff
+        if deals_override is None:
+            config.deals_cursor = deals_cutoff
         projects_created, project_errors = self._ensure_won_projects(config)
+
+        if deals_override is not None:
+            return imported, updated, 0, projects_created, 0, project_errors
 
         if not api:
             config = self._get_bitrix_config()
@@ -311,3 +318,29 @@ class BitrixDeal(models.Model):
             imported, updated, exported, projects_created,
             projects_exported, project_errors,
         )
+
+    @api.model
+    def sync_deal_event(self, config, deal_id):
+        """Fetch the current deal; event notifications only contain its ID."""
+        api = BitrixAPI(config.webhook_url)
+        deal = api.get_deal(deal_id)
+        if not deal:
+            return False
+        Partner = self.env["res.partner"].sudo()
+        company_id = deal.get("COMPANY_ID") or (deal.get("COMPANY_IDS") or [False])[0]
+        if company_id and not Partner.search([
+            ("bitrix_company_id", "=", str(company_id)),
+        ], limit=1):
+            Partner._pull_bitrix_companies(api.get_companies({"filter": {"ID": company_id}}))
+        contact_id = deal.get("CONTACT_ID") or (deal.get("CONTACT_IDS") or [False])[0]
+        if contact_id and not Partner.search([
+            ("bitrix_contact_id", "=", str(contact_id)),
+        ], limit=1):
+            contacts = api.get_contacts({"filter": {"ID": contact_id}})
+            Partner._pull_bitrix_contacts({str(item["ID"]): item for item in contacts})
+        result = self.sudo().sync_deals_with_bitrix(
+            api, quiet=False, config=config, deals_override=[deal],
+        )
+        if result[5]:
+            _logger.warning("Bitrix24: negocio %s pendiente: %s", deal_id, result[5])
+        return True
