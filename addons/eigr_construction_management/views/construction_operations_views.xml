@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_eigr_technical_file_list" model="ir.ui.view">
+        <field name="name">eigr.construction.technical.file.list</field>
+        <field name="model">eigr.construction.technical_file</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="project_id"/>
+                <field name="file_type"/>
+                <field name="version"/>
+                <field name="state" widget="badge"/>
+                <field name="date"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_eigr_technical_file_form" model="ir.ui.view">
+        <field name="name">eigr.construction.technical.file.form</field>
+        <field name="model">eigr.construction.technical_file</field>
+        <field name="arch" type="xml">
+            <form string="Expediente técnico">
+                <header>
+                    <button name="action_submit" type="object" string="Enviar a revisión"
+                            groups="eigr_construction_management.group_eigr_planner"
+                            invisible="state not in ('draft', 'rejected')"/>
+                    <button name="action_approve" type="object" string="Aprobar"
+                            groups="eigr_construction_management.group_eigr_manager"
+                            invisible="state != 'submitted'" class="btn-primary"/>
+                    <button name="action_reject" type="object" string="Observar"
+                            groups="eigr_construction_management.group_eigr_manager"
+                            invisible="state != 'submitted'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="project_id"/>
+                            <field name="file_type"/>
+                            <field name="version"/>
+                            <field name="date"/>
+                        </group>
+                        <group>
+                            <field name="approver_id"/>
+                            <field name="approval_date"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <field name="attachment_ids" widget="many2many_binary"/>
+                    <field name="notes"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_eigr_technical_file" model="ir.actions.act_window">
+        <field name="name">Expedientes técnicos</field>
+        <field name="res_model">eigr.construction.technical_file</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_eigr_schedule_list" model="ir.ui.view">
+        <field name="name">eigr.construction.schedule.list</field>
+        <field name="model">eigr.construction.schedule</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="project_id"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="weight_percent"/>
+                <field name="planned_percent"/>
+                <field name="actual_percent"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_eigr_schedule_form" model="ir.ui.view">
+        <field name="name">eigr.construction.schedule.form</field>
+        <field name="model">eigr.construction.schedule</field>
+        <field name="arch" type="xml">
+            <form string="Actividad del cronograma">
+                <sheet>
+                    <group>
+                        <field name="project_id"/>
+                        <field name="code"/>
+                        <field name="name"/>
+                        <field name="start_date"/>
+                        <field name="end_date"/>
+                        <field name="weight_percent"/>
+                        <field name="planned_percent"/>
+                        <field name="actual_percent"/>
+                        <field name="notes"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_eigr_schedule" model="ir.actions.act_window">
+        <field name="name">Cronograma</field>
+        <field name="res_model">eigr.construction.schedule</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_eigr_incident_list" model="ir.ui.view">
+        <field name="name">eigr.construction.incident.list</field>
+        <field name="model">eigr.construction.incident</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="date"/>
+                <field name="project_id"/>
+                <field name="name"/>
+                <field name="incident_type"/>
+                <field name="reported_by_id"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_eigr_incident_form" model="ir.ui.view">
+        <field name="name">eigr.construction.incident.form</field>
+        <field name="model">eigr.construction.incident</field>
+        <field name="arch" type="xml">
+            <form string="Incidencia de obra">
+                <header>
+                    <button name="action_start" type="object" string="Iniciar atención"
+                            groups="eigr_construction_management.group_eigr_resident,eigr_construction_management.group_eigr_manager"
+                            invisible="state != 'open'"/>
+                    <button name="action_close" type="object" string="Cerrar"
+                            groups="eigr_construction_management.group_eigr_resident,eigr_construction_management.group_eigr_manager"
+                            invisible="state != 'in_progress'" class="btn-primary"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="project_id"/>
+                        <field name="date"/>
+                        <field name="name"/>
+                        <field name="incident_type"/>
+                        <field name="reported_by_id"/>
+                        <field name="notes"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_eigr_incident" model="ir.actions.act_window">
+        <field name="name">Incidencias</field>
+        <field name="res_model">eigr.construction.incident</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_eigr_document_list" model="ir.ui.view">
+        <field name="name">eigr.construction.document.list</field>
+        <field name="model">eigr.construction.document</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="date"/>
+                <field name="project_id"/>
+                <field name="name"/>
+                <field name="doc_type"/>
+                <field name="reference"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_eigr_document_form" model="ir.ui.view">
+        <field name="name">eigr.construction.document.form</field>
+        <field name="model">eigr.construction.document</field>
+        <field name="arch" type="xml">
+            <form string="Documento de obra">
+                <sheet>
+                    <group>
+                        <field name="project_id"/>
+                        <field name="date"/>
+                        <field name="name"/>
+                        <field name="doc_type"/>
+                        <field name="reference"/>
+                    </group>
+                    <field name="attachment_ids" widget="many2many_binary"/>
+                    <field name="notes"/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="action_eigr_document" model="ir.actions.act_window">
+        <field name="name">Documentos de obra</field>
+        <field name="res_model">eigr.construction.document</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

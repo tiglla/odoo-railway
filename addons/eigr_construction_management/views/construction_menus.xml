@@ -55,4 +55,12 @@
         action="action_eigr_construction_closure"
         sequence="50"
     />
+    <menuitem id="menu_eigr_construction_technical_files" name="Expedientes técnicos"
+              parent="menu_eigr_construction_management" action="action_eigr_technical_file" sequence="60"/>
+    <menuitem id="menu_eigr_construction_schedules" name="Cronograma"
+              parent="menu_eigr_construction_management" action="action_eigr_schedule" sequence="70"/>
+    <menuitem id="menu_eigr_construction_incidents" name="Incidencias"
+              parent="menu_eigr_construction_management" action="action_eigr_incident" sequence="80"/>
+    <menuitem id="menu_eigr_construction_documents" name="Documentos"
+              parent="menu_eigr_construction_management" action="action_eigr_document" sequence="90"/>
 </odoo>

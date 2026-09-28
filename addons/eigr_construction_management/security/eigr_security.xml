@@ -248,5 +248,81 @@
             <field name="groups" eval="[Command.link(ref('group_eigr_manager'))]"/>
             <field name="domain_force">[(1, '=', 1)]</field>
         </record>
+
+        <record id="rule_eigr_technical_file_company" model="ir.rule">
+            <field name="name">Expedientes técnicos EIGR: multiempresa</field>
+            <field name="model_id" ref="model_eigr_construction_technical_file"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eigr_technical_file_assigned" model="ir.rule">
+            <field name="name">Equipo: expedientes de obras asignadas</field>
+            <field name="model_id" ref="model_eigr_construction_technical_file"/>
+            <field name="groups" eval="[Command.link(ref('group_eigr_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('project_id.responsible_id', '=', user.id), ('project_id.control_manager_id', '=', user.id), ('project_id.planning_engineer_id', '=', user.id), ('project_id.resident_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_eigr_technical_file_manager" model="ir.rule">
+            <field name="name">Jefe de Control: todos los expedientes técnicos</field>
+            <field name="model_id" ref="model_eigr_construction_technical_file"/>
+            <field name="groups" eval="[Command.link(ref('group_eigr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_eigr_schedule_company" model="ir.rule">
+            <field name="name">Cronograma EIGR: multiempresa</field>
+            <field name="model_id" ref="model_eigr_construction_schedule"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eigr_schedule_assigned" model="ir.rule">
+            <field name="name">Equipo: cronograma de obras asignadas</field>
+            <field name="model_id" ref="model_eigr_construction_schedule"/>
+            <field name="groups" eval="[Command.link(ref('group_eigr_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('project_id.responsible_id', '=', user.id), ('project_id.control_manager_id', '=', user.id), ('project_id.planning_engineer_id', '=', user.id), ('project_id.resident_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_eigr_schedule_manager" model="ir.rule">
+            <field name="name">Jefe de Control: todos los cronogramas</field>
+            <field name="model_id" ref="model_eigr_construction_schedule"/>
+            <field name="groups" eval="[Command.link(ref('group_eigr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_eigr_incident_company" model="ir.rule">
+            <field name="name">Incidencias EIGR: multiempresa</field>
+            <field name="model_id" ref="model_eigr_construction_incident"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eigr_incident_assigned" model="ir.rule">
+            <field name="name">Equipo: incidencias de obras asignadas</field>
+            <field name="model_id" ref="model_eigr_construction_incident"/>
+            <field name="groups" eval="[Command.link(ref('group_eigr_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('project_id.responsible_id', '=', user.id), ('project_id.control_manager_id', '=', user.id), ('project_id.planning_engineer_id', '=', user.id), ('project_id.resident_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_eigr_incident_manager" model="ir.rule">
+            <field name="name">Jefe de Control: todas las incidencias</field>
+            <field name="model_id" ref="model_eigr_construction_incident"/>
+            <field name="groups" eval="[Command.link(ref('group_eigr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+
+        <record id="rule_eigr_document_company" model="ir.rule">
+            <field name="name">Documentos EIGR: multiempresa</field>
+            <field name="model_id" ref="model_eigr_construction_document"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eigr_document_assigned" model="ir.rule">
+            <field name="name">Equipo: documentos de obras asignadas</field>
+            <field name="model_id" ref="model_eigr_construction_document"/>
+            <field name="groups" eval="[Command.link(ref('group_eigr_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('project_id.responsible_id', '=', user.id), ('project_id.control_manager_id', '=', user.id), ('project_id.planning_engineer_id', '=', user.id), ('project_id.resident_id', '=', user.id)]</field>
+        </record>
+        <record id="rule_eigr_document_manager" model="ir.rule">
+            <field name="name">Jefe de Control: todos los documentos</field>
+            <field name="model_id" ref="model_eigr_construction_document"/>
+            <field name="groups" eval="[Command.link(ref('group_eigr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
     </data>
 </odoo>

@@ -35,4 +35,11 @@
         <field name="padding">4</field>
         <field name="company_id" eval="False"/>
     </record>
+    <record id="sequence_eigr_construction_technical_file" model="ir.sequence">
+        <field name="name">Expediente técnico EIGR</field>
+        <field name="code">eigr.construction.technical_file</field>
+        <field name="prefix">EXP-%(year)s-</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>

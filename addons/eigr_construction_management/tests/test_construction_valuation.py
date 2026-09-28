@@ -121,6 +121,63 @@ class TestEigrConstructionValuation(TransactionCase):
         self.assertEqual(second.valuation_period_amount, 400)
         self.assertEqual(second.actual_progress, 70)
 
+    def test_out_of_order_approval_keeps_latest_project_progress(self):
+        first = self.Valuation.create(self._valuation_values())
+        first.action_submit()
+        second = self.Valuation.create(
+            self._valuation_values(
+                name="Valorización posterior",
+                start="2026-09-01",
+                cutoff="2026-09-30",
+                planned=4,
+                executed=4,
+                actual_cost=320,
+            )
+        )
+        second.action_submit()
+        second.action_approve()
+        self.assertEqual(self.project.progress_percent, 40)
+        with self.assertRaises(UserError):
+            first.action_approve()
+        self.assertEqual(first.state, "submitted")
+        self.assertEqual(self.project.latest_valuation_id, second)
+        self.assertEqual(self.project.progress_percent, 40)
+
+    def test_cannot_submit_older_valuation_after_later_approval(self):
+        later = self.Valuation.create(self._valuation_values(
+            start="2026-09-01", cutoff="2026-09-30"
+        ))
+        later.action_submit()
+        later.action_approve()
+        older = self.Valuation.create(self._valuation_values(
+            name="Valorización anterior",
+            start="2026-08-01",
+            cutoff="2026-08-31",
+        ))
+        with self.assertRaises(UserError):
+            older.action_submit()
+
+    def test_resubmits_stale_accumulated_values_before_approval(self):
+        first = self.Valuation.create(self._valuation_values())
+        first.action_submit()
+        second = self.Valuation.create(self._valuation_values(
+            name="Valorización posterior",
+            start="2026-09-01",
+            cutoff="2026-09-30",
+            planned=3,
+            executed=4,
+            actual_cost=320,
+        ))
+        second.action_submit()
+        first.action_approve()
+        with self.assertRaises(UserError):
+            second.action_approve()
+        self.assertEqual(self.project.progress_percent, 30)
+        second.action_reset_draft()
+        second.action_submit()
+        second.action_approve()
+        self.assertEqual(self.project.progress_percent, 70)
+
     def test_reject_progress_above_budget(self):
         valuation = self.Valuation.create(
             self._valuation_values(planned=10, executed=11, actual_cost=900)

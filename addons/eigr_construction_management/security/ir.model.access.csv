@@ -35,3 +35,16 @@ access_eigr_construction_requirement_admin,eigr.construction.requirement admin,m
 access_eigr_construction_requirement_line_admin,eigr.construction.requirement.line admin,model_eigr_construction_requirement_line,group_eigr_admin,1,1,1,1
 access_eigr_construction_closure_admin,eigr.construction.closure admin,model_eigr_construction_closure,group_eigr_admin,1,1,1,1
 access_eigr_construction_closure_line_admin,eigr.construction.closure.line admin,model_eigr_construction_closure_line,group_eigr_admin,1,1,1,1
+access_eigr_technical_file_user,eigr.technical.file user,model_eigr_construction_technical_file,group_eigr_user,1,0,0,0
+access_eigr_technical_file_planner,eigr.technical.file planner,model_eigr_construction_technical_file,group_eigr_planner,1,1,1,0
+access_eigr_technical_file_admin,eigr.technical.file admin,model_eigr_construction_technical_file,group_eigr_admin,1,1,1,1
+access_eigr_schedule_user,eigr.schedule user,model_eigr_construction_schedule,group_eigr_user,1,0,0,0
+access_eigr_schedule_planner,eigr.schedule planner,model_eigr_construction_schedule,group_eigr_planner,1,1,1,0
+access_eigr_schedule_admin,eigr.schedule admin,model_eigr_construction_schedule,group_eigr_admin,1,1,1,1
+access_eigr_incident_user,eigr.incident user,model_eigr_construction_incident,group_eigr_user,1,0,0,0
+access_eigr_incident_resident,eigr.incident resident,model_eigr_construction_incident,group_eigr_resident,1,1,1,0
+access_eigr_incident_admin,eigr.incident admin,model_eigr_construction_incident,group_eigr_admin,1,1,1,1
+access_eigr_document_user,eigr.document user,model_eigr_construction_document,group_eigr_user,1,0,0,0
+access_eigr_document_responsible,eigr.document responsible,model_eigr_construction_document,group_eigr_responsible,1,1,1,0
+access_eigr_document_resident,eigr.document resident,model_eigr_construction_document,group_eigr_resident,1,1,1,0
+access_eigr_document_admin,eigr.document admin,model_eigr_construction_document,group_eigr_admin,1,1,1,1

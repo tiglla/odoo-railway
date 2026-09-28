@@ -234,32 +234,40 @@ class EigrConstructionValuation(models.Model):
                 valuation.write({"line_ids": commands})
         return True
 
-    def _snapshot_previous_values(self):
+    def _previous_approved_values(self, line):
+        self.ensure_one()
         Line = self.env["eigr.construction.valuation.line"]
+        previous = Line.search([
+            ("valuation_id.project_id", "=", self.project_id.id),
+            ("valuation_id.budget_id", "=", self.budget_id.id),
+            ("valuation_id.state", "=", "approved"),
+            ("valuation_id.cutoff_date", "<", self.cutoff_date),
+            ("budget_line_id", "=", line.budget_line_id.id),
+        ])
+        return {
+            "previous_planned_quantity": sum(previous.mapped("planned_quantity_period")),
+            "previous_executed_quantity": sum(previous.mapped("executed_quantity_period")),
+            "previous_actual_cost": sum(previous.mapped("actual_cost_period")),
+        }
+
+    def _snapshot_previous_values(self):
         for valuation in self:
             for line in valuation.line_ids:
-                previous = Line.search(
-                    [
-                        ("valuation_id.project_id", "=", valuation.project_id.id),
-                        ("valuation_id.budget_id", "=", valuation.budget_id.id),
-                        ("valuation_id.state", "=", "approved"),
-                        ("valuation_id.cutoff_date", "<", valuation.cutoff_date),
-                        ("budget_line_id", "=", line.budget_line_id.id),
-                    ]
-                )
-                line.write(
-                    {
-                        "previous_planned_quantity": sum(
-                            previous.mapped("planned_quantity_period")
-                        ),
-                        "previous_executed_quantity": sum(
-                            previous.mapped("executed_quantity_period")
-                        ),
-                        "previous_actual_cost": sum(
-                            previous.mapped("actual_cost_period")
-                        ),
-                    }
-                )
+                line.write(valuation._previous_approved_values(line))
+
+    def _check_previous_snapshot(self):
+        for valuation in self:
+            for line in valuation.line_ids:
+                expected = valuation._previous_approved_values(line)
+                if any(
+                    float_compare(line[field], value, precision_digits=3) != 0
+                    for field, value in expected.items()
+                ):
+                    raise UserError(
+                        "Se aprobó una valorización anterior después del envío. "
+                        "Devuelva esta valorización a borrador y envíela nuevamente "
+                        "para actualizar los acumulados."
+                    )
 
     def _validate_progress(self):
         for valuation in self:
@@ -288,6 +296,7 @@ class EigrConstructionValuation(models.Model):
         if invalid:
             raise UserError("Solo una valorización borrador puede enviarse a aprobación.")
         for valuation in self:
+            valuation._check_approval_order()
             if valuation.project_id.state != "execution":
                 raise UserError("La obra debe estar en Ejecución para valorizar avances.")
             if valuation.budget_id.state != "approved":
@@ -297,14 +306,31 @@ class EigrConstructionValuation(models.Model):
         self.write({"state": "submitted"})
         return True
 
+    def _check_approval_order(self):
+        for valuation in self:
+            later = self.search([
+                ("project_id", "=", valuation.project_id.id),
+                ("state", "=", "approved"),
+                ("cutoff_date", ">", valuation.cutoff_date),
+            ], limit=1)
+            if later:
+                raise UserError(
+                    "No se puede aprobar una valorización con fecha de corte "
+                    "anterior a otra ya aprobada."
+                )
+
     def action_approve(self):
         if not self.env.user.has_group(
             "eigr_construction_management.group_eigr_manager"
         ):
             raise AccessError("Solo el Jefe de Control puede aprobar valorizaciónes.")
+        if len(self) != 1:
+            raise UserError("Apruebe las valorizaciones una por una, por fecha de corte.")
         invalid = self.filtered(lambda valuation: valuation.state != "submitted")
         if invalid:
             raise UserError("Solo una valorización enviada puede aprobarse.")
+        self._check_approval_order()
+        self._check_previous_snapshot()
         self._validate_progress()
         self.sudo().write(
             {
@@ -313,10 +339,9 @@ class EigrConstructionValuation(models.Model):
                 "approval_date": fields.Datetime.now(),
             }
         )
-        for valuation in self:
-            valuation.project_id.sudo().write(
-                {"progress_percent": valuation.actual_progress}
-            )
+        for project in self.mapped("project_id"):
+            latest = project.latest_valuation_id
+            project.sudo().write({"progress_percent": latest.actual_progress})
         return True
 
     def action_reset_draft(self):
