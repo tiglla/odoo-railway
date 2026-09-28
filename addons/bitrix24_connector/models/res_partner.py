@@ -213,6 +213,7 @@ class ResPartner(models.Model):
             )
 
         exported = 0
+        errors = []
 
         for partner in self.search(domain):
 
@@ -232,22 +233,27 @@ class ResPartner(models.Model):
 
             payload = self._odoo_values_to_bitrix(values)
 
-            if bitrix_id:
-
-                api.update_contact(bitrix_id, payload)
-
-            else:
-
-                new_id = api.create_contact(payload)
-
-                if new_id:
-                    partner.bitrix_contact_id = str(new_id)
+            try:
+                if bitrix_id:
+                    api.update_contact(bitrix_id, payload)
+                else:
+                    new_id = api.create_contact(payload)
+                    if new_id:
+                        partner.bitrix_contact_id = str(new_id)
+            except Exception as error:
+                message = (
+                    f"Contacto Odoo {partner.id} ({partner.name}), "
+                    f"correo {partner.email or 'vacío'}: {error}"
+                )
+                _logger.warning("Bitrix24: %s", message)
+                errors.append(message)
+                continue
 
             partner.bitrix_last_sync = fields.Datetime.now()
 
             exported += 1
 
-        return exported
+        return exported, errors
 
     def sync_with_bitrix(self, config):
 
@@ -265,11 +271,11 @@ class ResPartner(models.Model):
             self._pull_bitrix_contacts(contacts_by_id)
         )
 
-        exported = self._push_bitrix_contacts(
+        exported, contact_errors = self._push_bitrix_contacts(
             api, contacts_by_id, pulled_ids
         )
 
-        companies_imported, companies_updated, companies_exported = (
+        companies_imported, companies_updated, companies_exported, company_errors = (
             self.sync_companies_with_bitrix(api)
         )
 
@@ -289,6 +295,7 @@ class ResPartner(models.Model):
             "deals_imported": deals_imported,
             "deals_updated": deals_updated,
             "deals_exported": deals_exported,
+            "sync_errors": contact_errors + company_errors,
         }
 
     def import_bitrix_contacts(self):
@@ -446,6 +453,7 @@ class ResPartner(models.Model):
             domain.append(("id", "not in", list(pulled_ids)))
 
         exported = 0
+        errors = []
 
         for partner in self.search(domain):
 
@@ -462,17 +470,26 @@ class ResPartner(models.Model):
                     {"VALUE": partner.email, "VALUE_TYPE": "WORK"}
                 ]
 
-            if bitrix_id:
-                api.update_company(bitrix_id, payload)
-            else:
-                new_id = api.create_company(payload)
-                if new_id:
-                    partner.bitrix_company_id = str(new_id)
+            try:
+                if bitrix_id:
+                    api.update_company(bitrix_id, payload)
+                else:
+                    new_id = api.create_company(payload)
+                    if new_id:
+                        partner.bitrix_company_id = str(new_id)
+            except Exception as error:
+                message = (
+                    f"Empresa Odoo {partner.id} ({partner.name}), "
+                    f"correo {partner.email or 'vacío'}: {error}"
+                )
+                _logger.warning("Bitrix24: %s", message)
+                errors.append(message)
+                continue
 
             partner.bitrix_last_sync = fields.Datetime.now()
             exported += 1
 
-        return exported
+        return exported, errors
 
     def sync_companies_with_bitrix(self, api):
 
@@ -482,8 +499,8 @@ class ResPartner(models.Model):
             self._pull_bitrix_companies(companies)
         )
 
-        exported = self._push_bitrix_companies(
+        exported, errors = self._push_bitrix_companies(
             api, pulled_ids
         )
 
-        return imported, updated, exported
+        return imported, updated, exported, errors

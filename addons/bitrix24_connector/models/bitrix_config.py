@@ -58,24 +58,32 @@ class BitrixConfig(models.Model):
                 % error
             )
 
+        errors = result.get("sync_errors", [])
+        message = _(
+            "Sync completado. Contactos "
+            "N: %(imported)s | A: %(updated)s | "
+            "E: %(exported)s | Empresas "
+            "N: %(companies_imported)s | "
+            "A: %(companies_updated)s | "
+            "E: %(companies_exported)s | "
+            "Negocios N: %(deals_imported)s | "
+            "A: %(deals_updated)s | "
+            "E: %(deals_exported)s"
+        ) % result
+        if errors:
+            message += _(" | Fallidos: %s. ") % len(errors)
+            message += " | ".join(errors[:3])
+            if len(errors) > 3:
+                message += _(" | Revise los logs para ver los demás.")
+
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
                 "title": _("Bitrix24"),
-                "message": _(
-                    "Sync completado. Contactos "
-                    "N: %(imported)s | A: %(updated)s | "
-                    "E: %(exported)s | Empresas "
-                    "N: %(companies_imported)s | "
-                    "A: %(companies_updated)s | "
-                    "E: %(companies_exported)s | "
-                    "Negocios N: %(deals_imported)s | "
-                    "A: %(deals_updated)s | "
-                    "E: %(deals_exported)s"
-                ) % result,
-                "type": "success",
-                "sticky": False,
+                "message": message,
+                "type": "warning" if errors else "success",
+                "sticky": bool(errors),
             },
         }
 
