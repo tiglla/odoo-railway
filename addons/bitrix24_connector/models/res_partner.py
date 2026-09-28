@@ -372,7 +372,7 @@ class ResPartner(models.Model):
 
         return {
             "name": title,
-            "company_type": "company",
+            "is_company": True,
             "phone": ResPartner._get_multifield_value(
                 company.get("PHONE")
             ) or False,
@@ -386,6 +386,7 @@ class ResPartner(models.Model):
 
         return {
             "name": partner.name or "",
+            "is_company": partner.is_company,
             "phone": partner.phone or False,
             "email": partner.email or False,
         }
@@ -447,7 +448,7 @@ class ResPartner(models.Model):
 
     def _push_bitrix_companies(self, api, pulled_ids):
 
-        domain = [("company_type", "=", "company")]
+        domain = [("is_company", "=", True)]
 
         if pulled_ids:
             domain.append(("id", "not in", list(pulled_ids)))
